@@ -14,9 +14,7 @@ class SessionState(BaseModel):
 
 class RouteResolution(BaseModel):
     intent: str | None = None
-    source: str = Field(
-        description="How routing was determined (rule, llm, rule+llm_args, etc.)"
-    )
+    source: str = Field(default="none")
     args: dict[str, Any] = Field(default_factory=dict)
 
 

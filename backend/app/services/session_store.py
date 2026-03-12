@@ -1,3 +1,5 @@
+# backend/app/services/session_store.py
+
 from __future__ import annotations
 
 from typing import Dict
@@ -9,14 +11,15 @@ class SessionStore:
     """
     In-memory session store.
 
-    Later this can be replaced by Redis without touching the agent logic.
+    Can later be replaced by Redis or DB-backed storage
+    without changing agent orchestration code.
     """
 
     def __init__(self) -> None:
         self._sessions: Dict[str, SessionState] = {}
 
     def get_or_create(self, session_id: str | None) -> tuple[str, SessionState]:
-        if not session_id:
+        if not session_id or not session_id.strip():
             session_id = "demo-session"
 
         if session_id not in self._sessions:
@@ -24,12 +27,15 @@ class SessionStore:
 
         return session_id, self._sessions[session_id]
 
-    def update(self, session_id: str, state: SessionState) -> None:
-        self._sessions[session_id] = state
-
     def get(self, session_id: str) -> SessionState | None:
         return self._sessions.get(session_id)
+
+    def update(self, session_id: str, state: SessionState) -> None:
+        self._sessions[session_id] = state
 
     def delete(self, session_id: str) -> None:
         if session_id in self._sessions:
             del self._sessions[session_id]
+
+    def clear(self) -> None:
+        self._sessions.clear()
