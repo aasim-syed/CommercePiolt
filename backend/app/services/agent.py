@@ -12,8 +12,9 @@ from app.exceptions import AgentExecutionError, ToolValidationError
 from app.services.agent_router import resolve_route
 from app.tools.registry import TOOL_REGISTRY
 from app.schemas.agent import SessionState, RouteResolution, ToolExecutionResult
+from app.services.session_store import SessionStore
 
-SESSION_STORE: dict[str, SessionState] = {}
+session_store = SessionStore()
 
 
 def get_or_create_session(session_id: str | None) -> tuple[str, SessionState]:
@@ -39,7 +40,7 @@ async def handle_chat(
             f"Message is too long. Maximum allowed length is {MAX_MESSAGE_LENGTH}."
         )
 
-    _session_id, state = get_or_create_session(session_id)
+    session_id, state = session_store.get_or_create(session_id)
 
     if merchant_id:
         state["merchant_id"] = merchant_id
