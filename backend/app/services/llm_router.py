@@ -9,6 +9,7 @@ from app.constants import (
     CREATE_PAYMENT_LINK,
     GET_RESERVE_BALANCE,
 )
+from app.services.llm_client import LLMClient
 
 SUPPORTED_TOOLS = {
     CREATE_PAYMENT_LINK,
@@ -18,20 +19,16 @@ SUPPORTED_TOOLS = {
 
 
 class LLMRouter:
-    """
-    Placeholder LLM router.
-
-    Current behavior:
-    - returns None, so the system continues using rule-based routing only.
-
-    Later behavior:
-    - call an LLM with a small intent-classification prompt
-    - return one of the supported tool names
-    """
+    def __init__(self) -> None:
+        self.client = LLMClient()
 
     async def detect_intent(self, message: str) -> str | None:
-        _ = message
-        return None
+        intent = await self.client.classify_intent(message)
+
+        if intent not in SUPPORTED_TOOLS:
+            return None
+
+        return intent
 
     async def extract_tool_args(
         self,
@@ -39,10 +36,7 @@ class LLMRouter:
         message: str,
         session_state: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        _ = tool_name
         _ = message
         _ = session_state
-
-        if tool_name not in SUPPORTED_TOOLS:
-            return {}
-
         return {}

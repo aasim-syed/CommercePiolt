@@ -4,8 +4,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "CommercePilot Backend"
     app_env: str = "dev"
+
     pine_labs_base_url: str = "https://sandbox.example.com"
     pine_labs_api_key: str = "demo-key"
+
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen3:4b"
 
     model_config = SettingsConfigDict(
         env_file=".env",
