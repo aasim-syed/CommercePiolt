@@ -1,28 +1,28 @@
-# backend/app/services/pine_labs.py
-
 from __future__ import annotations
 
+import httpx
 from typing import Any
 
-import httpx
-
 from app.config import settings
-from app.constants import DEFAULT_CURRENCY
-from app.exceptions import PineLabsAPIError
+from app.exceptions import AgentExecutionError
+from app.services.logger import get_logger
+
+logger = get_logger("pine_labs")
 
 
 class PineLabsClient:
     def __init__(self) -> None:
         self.base_url = settings.pine_labs_base_url.rstrip("/")
         self.api_key = settings.pine_labs_api_key
-        self.timeout = httpx.Timeout(10.0)
+        self.timeout = httpx.Timeout(20.0)
 
-        self.headers = {
+    def _headers(self) -> dict[str, str]:
+        return {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
         }
 
-    async def _request(
+    async def request(
         self,
         method: str,
         path: str,
@@ -30,53 +30,59 @@ class PineLabsClient:
     ) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
 
+        logger.info(
+            "pine_labs_request_started",
+            extra={
+                "extra_data": {
+                    "method": method,
+                    "url": url,
+                }
+            },
+        )
+
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.request(
                     method=method,
                     url=url,
+                    headers=self._headers(),
                     json=payload,
-                    headers=self.headers,
                 )
         except httpx.RequestError as exc:
-            raise PineLabsAPIError(f"Pine Labs request failed: {exc}") from exc
+            logger.exception(
+                "pine_labs_network_error",
+                extra={"extra_data": {"url": url}},
+            )
+            raise AgentExecutionError(f"Pine Labs network error: {exc}") from exc
 
         if response.status_code >= 400:
-            raise PineLabsAPIError(
-                message=f"Pine Labs API error: {response.status_code} {response.text}",
-                status_code=response.status_code,
+            logger.error(
+                "pine_labs_api_error",
+                extra={
+                    "extra_data": {
+                        "url": url,
+                        "status_code": response.status_code,
+                        "response": response.text,
+                    }
+                },
+            )
+            raise AgentExecutionError(
+                f"Pine Labs API error {response.status_code}: {response.text}"
             )
 
-        try:
-            return response.json()
-        except ValueError as exc:
-            raise PineLabsAPIError("Pine Labs returned invalid JSON") from exc
+        data = response.json()
 
-    async def create_payment_link(
-        self,
-        amount: float,
-        merchant_id: str,
-    ) -> dict[str, Any]:
-        payload = {
-            "merchantId": merchant_id,
-            "amount": amount,
-            "currency": DEFAULT_CURRENCY,
-        }
-
-        return await self._request(
-            method="POST",
-            path="/payments/link",
-            payload=payload,
+        logger.info(
+            "pine_labs_request_completed",
+            extra={
+                "extra_data": {
+                    "url": url,
+                    "status_code": response.status_code,
+                }
+            },
         )
 
-    async def check_payment_status(self, payment_ref: str) -> dict[str, Any]:
-        return await self._request(
-            method="GET",
-            path=f"/payments/status/{payment_ref}",
-        )
+        return data
 
-    async def get_reserve_balance(self, merchant_id: str) -> dict[str, Any]:
-        return await self._request(
-            method="GET",
-            path=f"/merchants/{merchant_id}/reserve",
-        )
+
+pine_labs_client = PineLabsClient()
