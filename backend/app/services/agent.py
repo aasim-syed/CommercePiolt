@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 from app.constants import (
@@ -12,12 +11,13 @@ from app.constants import (
     MAX_MESSAGE_LENGTH,
 )
 from app.exceptions import AgentExecutionError, ToolValidationError
+from app.services.agent_router import resolve_route
 from app.tools.registry import TOOL_REGISTRY
 
 SESSION_STORE: dict[str, dict[str, Any]] = {}
 
 
-def _get_or_create_session(session_id: str | None) -> tuple[str, dict[str, Any]]:
+def get_or_create_session(session_id: str | None) -> tuple[str, dict[str, Any]]:
     if not session_id:
         session_id = "demo-session"
 
@@ -30,20 +30,6 @@ def _get_or_create_session(session_id: str | None) -> tuple[str, dict[str, Any]]
         }
 
     return session_id, SESSION_STORE[session_id]
-
-
-def _extract_amount(message: str) -> float | None:
-    match = re.search(r"(\d+(?:\.\d{1,2})?)", message)
-    if not match:
-        return None
-    return float(match.group(1))
-
-
-def _extract_payment_ref(message: str) -> str | None:
-    match = re.search(r"(pay_[a-zA-Z0-9]+)", message)
-    if not match:
-        return None
-    return match.group(1)
 
 
 async def handle_chat(
@@ -59,23 +45,40 @@ async def handle_chat(
             f"Message is too long. Maximum allowed length is {MAX_MESSAGE_LENGTH}."
         )
 
-    normalized = message.strip().lower()
-    session_id, state = _get_or_create_session(session_id)
+    _session_id, state = get_or_create_session(session_id)
 
     if merchant_id:
         state["merchant_id"] = merchant_id
 
-    active_merchant_id = state.get("merchant_id") or merchant_id
-
     try:
-        if "payment link" in normalized or "pay" in normalized or "collect" in normalized:
-            amount = _extract_amount(message)
+        route = await resolve_route(message=message, session_state=state)
+        intent = route["intent"]
+        extracted_args = route["args"]
+
+        if intent is None:
+            return (
+                "I can help with creating payment links, checking payment status, "
+                "and fetching reserve balance.",
+                None,
+                state,
+                None,
+            )
+
+        if intent == CREATE_PAYMENT_LINK:
+            amount = extracted_args.get("amount")
             if amount is None:
-                reply = "I could not find the amount. Please specify an amount like 1200."
-                return reply, None, state, None
+                return (
+                    "Please specify an amount like 1200.",
+                    None,
+                    state,
+                    None,
+                )
 
             tool = TOOL_REGISTRY[CREATE_PAYMENT_LINK]
-            result = await tool(amount=amount, merchant_id=active_merchant_id)
+            result = await tool(
+                amount=amount,
+                merchant_id=state.get("merchant_id"),
+            )
 
             state["last_payment_ref"] = result.get("payment_ref")
             state["last_order_id"] = result.get("order_id")
@@ -89,23 +92,34 @@ async def handle_chat(
 
             return (
                 reply,
-                {"tool_name": CREATE_PAYMENT_LINK, "arguments": {"amount": amount}},
+                {
+                    "tool_name": CREATE_PAYMENT_LINK,
+                    "arguments": {
+                        "amount": amount,
+                        "merchant_id": state.get("merchant_id"),
+                    },
+                },
                 state,
                 result,
             )
 
-        if "status" in normalized:
-            payment_ref = _extract_payment_ref(message) or state.get("last_payment_ref")
+        if intent == CHECK_PAYMENT_STATUS:
+            payment_ref = extracted_args.get("payment_ref") or state.get("last_payment_ref")
             if not payment_ref:
-                reply = "I could not find a payment reference. Please share one like pay_abc123."
-                return reply, None, state, None
+                return (
+                    "Please provide a payment reference.",
+                    None,
+                    state,
+                    None,
+                )
 
             tool = TOOL_REGISTRY[CHECK_PAYMENT_STATUS]
             result = await tool(payment_ref=payment_ref)
 
             state["last_tool_call"] = CHECK_PAYMENT_STATUS
 
-            reply = f"Payment {result['payment_ref']} status: {result['status']}."
+            reply = f"Payment {payment_ref} status: {result['status']}."
+
             return (
                 reply,
                 {
@@ -116,33 +130,35 @@ async def handle_chat(
                 result,
             )
 
-        if "balance" in normalized or "reserve" in normalized:
+        if intent == GET_RESERVE_BALANCE:
             tool = TOOL_REGISTRY[GET_RESERVE_BALANCE]
-            result = await tool(merchant_id=active_merchant_id)
+            result = await tool(merchant_id=state.get("merchant_id"))
 
             state["last_tool_call"] = GET_RESERVE_BALANCE
 
             reply = (
-                f"Your reserve balance is ₹{result['available_balance']:.2f} "
-                f"{result['currency']}."
+                f"Your reserve balance is "
+                f"₹{result['available_balance']:.2f} {result['currency']}."
             )
+
             return (
                 reply,
                 {
                     "tool_name": GET_RESERVE_BALANCE,
-                    "arguments": {"merchant_id": active_merchant_id},
+                    "arguments": {"merchant_id": state.get("merchant_id")},
                 },
                 state,
                 result,
             )
 
-        reply = (
-            "I can help with creating payment links, checking payment status, "
-            "and fetching reserve balance."
+        return (
+            "Unsupported action.",
+            None,
+            state,
+            None,
         )
-        return reply, None, state, None
 
     except ToolValidationError:
         raise
     except Exception as exc:
-        raise AgentExecutionError(f"Agent failed to process request: {exc}") from exc
+        raise AgentExecutionError(f"Agent failure: {exc}") from exc
