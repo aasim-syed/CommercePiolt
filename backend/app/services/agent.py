@@ -1,5 +1,3 @@
-# backend/app/services/agent.py
-
 from __future__ import annotations
 
 from typing import Any
@@ -13,21 +11,17 @@ from app.constants import (
 from app.exceptions import AgentExecutionError, ToolValidationError
 from app.services.agent_router import resolve_route
 from app.tools.registry import TOOL_REGISTRY
+from app.schemas.agent import SessionState, RouteResolution, ToolExecutionResult
 
-SESSION_STORE: dict[str, dict[str, Any]] = {}
+SESSION_STORE: dict[str, SessionState] = {}
 
 
-def get_or_create_session(session_id: str | None) -> tuple[str, dict[str, Any]]:
+def get_or_create_session(session_id: str | None) -> tuple[str, SessionState]:
     if not session_id:
         session_id = "demo-session"
 
     if session_id not in SESSION_STORE:
-        SESSION_STORE[session_id] = {
-            "merchant_id": None,
-            "last_payment_ref": None,
-            "last_order_id": None,
-            "last_tool_call": None,
-        }
+        SESSION_STORE[session_id] = SessionState()
 
     return session_id, SESSION_STORE[session_id]
 
@@ -51,9 +45,11 @@ async def handle_chat(
         state["merchant_id"] = merchant_id
 
     try:
-        route = await resolve_route(message=message, session_state=state)
+        route_dict = await resolve_route(message=message, session_state=state.model_dump())
+        route = RouteResolution(**route_dict)
         intent = route["intent"]
         extracted_args = route["args"]
+        route_source = route["source"]
 
         if intent is None:
             return (
@@ -74,13 +70,15 @@ async def handle_chat(
                     None,
                 )
 
+            merchant_for_call = extracted_args.get("merchant_id") or state.merchant_id
+
             tool = TOOL_REGISTRY[CREATE_PAYMENT_LINK]
             result = await tool(
-                amount=amount,
-                merchant_id=state.get("merchant_id"),
+                amount=float(amount),
+                merchant_id=merchant_for_call,
             )
 
-            state["last_payment_ref"] = result.get("payment_ref")
+            state.last_payment_ref = result.get("payment_ref")
             state["last_order_id"] = result.get("order_id")
             state["last_tool_call"] = CREATE_PAYMENT_LINK
 
@@ -95,8 +93,9 @@ async def handle_chat(
                 {
                     "tool_name": CREATE_PAYMENT_LINK,
                     "arguments": {
-                        "amount": amount,
-                        "merchant_id": state.get("merchant_id"),
+                        "amount": float(amount),
+                        "merchant_id": merchant_for_call,
+                        "route_source": route_source,
                     },
                 },
                 state,
@@ -114,7 +113,7 @@ async def handle_chat(
                 )
 
             tool = TOOL_REGISTRY[CHECK_PAYMENT_STATUS]
-            result = await tool(payment_ref=payment_ref)
+            result = await tool(payment_ref=str(payment_ref))
 
             state["last_tool_call"] = CHECK_PAYMENT_STATUS
 
@@ -124,15 +123,20 @@ async def handle_chat(
                 reply,
                 {
                     "tool_name": CHECK_PAYMENT_STATUS,
-                    "arguments": {"payment_ref": payment_ref},
+                    "arguments": {
+                        "payment_ref": str(payment_ref),
+                        "route_source": route_source,
+                    },
                 },
                 state,
                 result,
             )
 
         if intent == GET_RESERVE_BALANCE:
+            merchant_for_call = extracted_args.get("merchant_id") or state.merchant_id
+
             tool = TOOL_REGISTRY[GET_RESERVE_BALANCE]
-            result = await tool(merchant_id=state.get("merchant_id"))
+            result = await tool(merchant_id=merchant_for_call)
 
             state["last_tool_call"] = GET_RESERVE_BALANCE
 
@@ -145,7 +149,10 @@ async def handle_chat(
                 reply,
                 {
                     "tool_name": GET_RESERVE_BALANCE,
-                    "arguments": {"merchant_id": state.get("merchant_id")},
+                    "arguments": {
+                        "merchant_id": merchant_for_call,
+                        "route_source": route_source,
+                    },
                 },
                 state,
                 result,
