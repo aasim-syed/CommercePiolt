@@ -1,24 +1,18 @@
-# backend/app/services/llm_client.py
-
 from __future__ import annotations
 
 from typing import Any
 
 import httpx
 
+from app.config import settings
 from app.exceptions import AgentExecutionError
 
 
 class LLMClient:
-    def __init__(
-        self,
-        base_url: str = "http://localhost:11434",
-        model: str = "qwen3:4b",
-        timeout_seconds: float = 20.0,
-    ) -> None:
-        self.base_url = base_url.rstrip("/")
-        self.model = model
-        self.timeout = httpx.Timeout(timeout_seconds)
+    def __init__(self) -> None:
+        self.base_url = settings.ollama_base_url.rstrip("/")
+        self.model = settings.ollama_model
+        self.timeout = httpx.Timeout(20.0)
 
     async def chat(self, messages: list[dict[str, str]]) -> str:
         url = f"{self.base_url}/api/chat"
@@ -42,8 +36,7 @@ class LLMClient:
             )
 
         data = response.json()
-        message = data.get("message", {})
-        content = message.get("content")
+        content = data.get("message", {}).get("content")
 
         if not content:
             raise AgentExecutionError("Ollama returned an empty response.")
@@ -54,11 +47,10 @@ class LLMClient:
         system_prompt = (
             "You are an intent classifier for a payments agent. "
             "Return exactly one of these labels only:\n"
-            "- create_payment_link\n"
-            "- check_payment_status\n"
-            "- get_reserve_balance\n"
-            "- none\n"
-            "Do not add any explanation."
+            "create_payment_link\n"
+            "check_payment_status\n"
+            "get_reserve_balance\n"
+            "none"
         )
 
         result = await self.chat(
@@ -77,10 +69,7 @@ class LLMClient:
             "none",
         }
 
-        if normalized not in allowed:
-            return None
-
-        if normalized == "none":
+        if normalized not in allowed or normalized == "none":
             return None
 
         return normalized

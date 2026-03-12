@@ -1,5 +1,3 @@
-# backend/app/services/llm_router.py
-
 from __future__ import annotations
 
 from typing import Any
@@ -24,10 +22,8 @@ class LLMRouter:
 
     async def detect_intent(self, message: str) -> str | None:
         intent = await self.client.classify_intent(message)
-
         if intent not in SUPPORTED_TOOLS:
             return None
-
         return intent
 
     async def extract_tool_args(
