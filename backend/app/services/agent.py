@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from app.config import settings
 from app.constants import (
     CHECK_PAYMENT_STATUS,
     CREATE_PAYMENT_LINK,
     GET_RESERVE_BALANCE,
     MAX_MESSAGE_LENGTH,
+    STATUS_LINK_CREATED,
 )
 from app.exceptions import AgentExecutionError, ToolValidationError
 from app.schemas.agent import RouteResolution
@@ -12,7 +14,6 @@ from app.services.agent_router import resolve_route
 from app.services.logger import get_logger
 from app.services.session_store import session_store
 from app.tools.registry import TOOL_REGISTRY
-from app.constants import STATUS_LINK_CREATED
 
 logger = get_logger("agent")
 
@@ -84,7 +85,11 @@ async def handle_chat(
                     None,
                 )
 
-            merchant_for_call = route.args.get("merchant_id") or state.merchant_id
+            merchant_for_call = (
+                route.args.get("merchant_id")
+                or state.merchant_id
+                or settings.pine_labs_merchant_id
+            )
 
             tool = TOOL_REGISTRY[CREATE_PAYMENT_LINK]
             result = await tool(
@@ -92,16 +97,21 @@ async def handle_chat(
                 merchant_id=merchant_for_call,
             )
 
+            state.merchant_id = merchant_for_call
             state.last_payment_ref = result.get("payment_ref")
             state.last_order_id = result.get("order_id")
             state.last_tool_call = CREATE_PAYMENT_LINK
             state.last_payment_status = result.get("status", STATUS_LINK_CREATED)
             session_store.update(resolved_session_id, state)
 
+            amount_value = float(result.get("amount", amount))
+            payment_ref = result.get("payment_ref")
+            payment_url = result.get("payment_url")
+
             reply = (
-                f"Created payment link for ₹{result['amount']:.2f}. "
-                f"Payment ref: {result['payment_ref']}. "
-                f"URL: {result['payment_url']}"
+                f"Created payment link for ₹{amount_value:.2f}. "
+                f"Payment ref: {payment_ref}. "
+                f"URL: {payment_url}"
             )
 
             return (
@@ -128,16 +138,14 @@ async def handle_chat(
                     None,
                 )
 
-            if state.last_payment_ref == payment_ref and state.last_payment_status:
-                result = {
-                    "payment_ref": str(payment_ref),
-                    "status": state.last_payment_status,
-                }
-            else:
-                tool = TOOL_REGISTRY[CHECK_PAYMENT_STATUS]
-                result = await tool(payment_ref=str(payment_ref))
+            tool = TOOL_REGISTRY[CHECK_PAYMENT_STATUS]
+            result = await tool(
+                payment_ref=str(payment_ref),
+                current_status=state.last_payment_status,
+            )
 
             state.last_tool_call = CHECK_PAYMENT_STATUS
+            state.last_payment_ref = str(payment_ref)
             state.last_payment_status = result.get("status")
             session_store.update(resolved_session_id, state)
 
@@ -157,18 +165,26 @@ async def handle_chat(
             )
 
         if route.intent == GET_RESERVE_BALANCE:
-            merchant_for_call = route.args.get("merchant_id") or state.merchant_id
+            merchant_for_call = (
+                route.args.get("merchant_id")
+                or state.merchant_id
+                or settings.pine_labs_merchant_id
+            )
 
             tool = TOOL_REGISTRY[GET_RESERVE_BALANCE]
             result = await tool(merchant_id=merchant_for_call)
 
+            state.merchant_id = merchant_for_call
             state.last_tool_call = GET_RESERVE_BALANCE
             session_store.update(resolved_session_id, state)
 
-            reply = (
-                f"Your reserve balance is "
-                f"₹{result['available_balance']:.2f} {result['currency']}."
-            )
+            balance_value = result.get("available_balance")
+            currency = result.get("currency", "INR")
+
+            if balance_value is None:
+                reply = f"Reserve balance fetched successfully for merchant {merchant_for_call}."
+            else:
+                reply = f"Your reserve balance is ₹{float(balance_value):.2f} {currency}."
 
             return (
                 reply,
@@ -192,6 +208,8 @@ async def handle_chat(
 
     except ToolValidationError:
         raise
+    except AgentExecutionError:
+        raise
     except Exception as exc:
         logger.exception(
             "agent_failure",
@@ -202,4 +220,4 @@ async def handle_chat(
                 }
             },
         )
-        raise AgentExecutionError(f"Agent failure: {exc}") from exc
+        raise AgentExecutionError("Something went wrong while processing the request.") from exc

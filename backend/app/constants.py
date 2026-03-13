@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+# Tool names (internal registry)
 TOOL_CREATE_PAYMENT_LINK = "create_payment_link"
 TOOL_CHECK_PAYMENT_STATUS = "check_payment_status"
 TOOL_GET_RESERVE_BALANCE = "get_reserve_balance"
+
+
+# Public aliases used by agent layer
+CREATE_PAYMENT_LINK = TOOL_CREATE_PAYMENT_LINK
+CHECK_PAYMENT_STATUS = TOOL_CHECK_PAYMENT_STATUS
+GET_RESERVE_BALANCE = TOOL_GET_RESERVE_BALANCE
 
 STATUS_LINK_CREATED = "LINK_CREATED"
 STATUS_PENDING = "PENDING"
@@ -15,3 +22,4 @@ WEBHOOK_EVENT_PAYMENT_FAILED = "payment.failed"
 WEBHOOK_EVENT_PAYMENT_EXPIRED = "payment.expired"
 
 DEFAULT_CURRENCY = "INR"
+MAX_MESSAGE_LENGTH = 500

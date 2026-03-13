@@ -21,7 +21,9 @@ class PineLabsWebhookPayload(BaseModel):
 
 
 class PineLabsWebhookResponse(BaseModel):
-    status: str
+    ok: bool
     event: PineLabsEvent
     payment_ref: str
-    updated: bool
+    updated_status: str
+    session_found: bool
+    message: str

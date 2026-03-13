@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Dict
+from uuid import uuid4
 
 from app.schemas.agent import SessionState
 
@@ -10,19 +11,27 @@ class SessionStore:
         self._sessions: Dict[str, SessionState] = {}
 
     def get_or_create(self, session_id: str | None) -> tuple[str, SessionState]:
-        if not session_id or not session_id.strip():
-            session_id = "demo-session"
+        resolved_session_id = (session_id or "").strip() or f"session-{uuid4().hex[:12]}"
 
-        if session_id not in self._sessions:
-            self._sessions[session_id] = SessionState()
+        if resolved_session_id not in self._sessions:
+            self._sessions[resolved_session_id] = SessionState()
 
-        return session_id, self._sessions[session_id]
+        return resolved_session_id, self._sessions[resolved_session_id]
 
     def get(self, session_id: str) -> SessionState | None:
         return self._sessions.get(session_id)
 
     def update(self, session_id: str, state: SessionState) -> None:
         self._sessions[session_id] = state
+
+    def patch(self, session_id: str, **updates) -> SessionState | None:
+        state = self._sessions.get(session_id)
+        if not state:
+            return None
+
+        updated_state = state.model_copy(update=updates)
+        self._sessions[session_id] = updated_state
+        return updated_state
 
     def delete(self, session_id: str) -> None:
         if session_id in self._sessions:
@@ -43,8 +52,8 @@ class SessionStore:
             return False
 
         session_id, state = found
-        state.last_payment_status = status
-        self._sessions[session_id] = state
+        updated_state = state.model_copy(update={"last_payment_status": status})
+        self._sessions[session_id] = updated_state
         return True
 
 
