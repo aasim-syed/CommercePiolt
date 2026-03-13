@@ -1,5 +1,3 @@
-# backend/app/services/agent_router.py
-
 from __future__ import annotations
 
 import re
@@ -27,6 +25,13 @@ def extract_payment_ref_rule_based(message: str) -> str | None:
     return match.group(1)
 
 
+def extract_merchant_id_rule_based(message: str) -> str | None:
+    match = re.search(r"\bmerchant[\s:_-]*([a-zA-Z0-9_-]+)\b", message, re.IGNORECASE)
+    if not match:
+        return None
+    return match.group(1)
+
+
 def detect_intent_rule_based(message: str) -> str | None:
     text = message.lower().strip()
 
@@ -36,7 +41,13 @@ def detect_intent_rule_based(message: str) -> str | None:
     if "balance" in text or "reserve" in text:
         return GET_RESERVE_BALANCE
 
-    if "payment link" in text or "collect" in text or "pay " in text or text.startswith("pay"):
+    if (
+        "payment link" in text
+        or "create payment" in text
+        or "create link" in text
+        or "collect" in text
+        or text.startswith("pay ")
+    ):
         return CREATE_PAYMENT_LINK
 
     return None
@@ -63,6 +74,8 @@ async def resolve_route(
     message: str,
     session_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    session_state = session_state or {}
+
     intent = detect_intent_rule_based(message)
     source = "rule"
     llm_router = LLMRouter()
@@ -80,6 +93,10 @@ async def resolve_route(
 
     args: dict[str, Any] = {}
 
+    merchant_id = extract_merchant_id_rule_based(message)
+    if merchant_id is not None:
+        args["merchant_id"] = merchant_id
+
     if intent == CREATE_PAYMENT_LINK:
         amount = extract_amount_rule_based(message)
         if amount is not None:
@@ -95,8 +112,11 @@ async def resolve_route(
     if intent == CREATE_PAYMENT_LINK and args.get("amount") is None:
         missing_required = True
 
-    if intent == CHECK_PAYMENT_STATUS and args.get("payment_ref") is None:
-        missing_required = True
+    if intent == CHECK_PAYMENT_STATUS:
+        has_payment_ref = args.get("payment_ref") is not None
+        has_session_payment_ref = bool(session_state.get("last_payment_ref"))
+        if not has_payment_ref and not has_session_payment_ref:
+            missing_required = True
 
     if missing_required:
         llm_args = await llm_router.extract_tool_args(

@@ -1,49 +1,32 @@
-# backend/app/services/llm_client.py
-
 from __future__ import annotations
 
-from typing import Any
-
-import httpx
-
-from app.config import settings
-from app.exceptions import AgentExecutionError
+from app.services.bedrock_client import get_bedrock_client
 
 
 class LLMClient:
-    def __init__(self) -> None:
-        self.base_url = settings.ollama_base_url.rstrip("/")
-        self.model = settings.ollama_model
-        self.timeout = httpx.Timeout(20.0)
-
     async def chat(self, messages: list[dict[str, str]]) -> str:
-        url = f"{self.base_url}/api/chat"
+        system_parts: list[str] = []
+        user_parts: list[str] = []
 
-        payload: dict[str, Any] = {
-            "model": self.model,
-            "messages": messages,
-            "stream": False,
-            "keep_alive": "10m",
-        }
+        for message in messages:
+            role = message.get("role", "")
+            content = message.get("content", "")
 
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(url, json=payload)
-        except httpx.RequestError as exc:
-            raise AgentExecutionError(f"Failed to reach Ollama: {exc}") from exc
+            if role == "system":
+                system_parts.append(content)
+            else:
+                user_parts.append(f"{role.upper()}:\n{content}")
 
-        if response.status_code >= 400:
-            raise AgentExecutionError(
-                f"Ollama returned {response.status_code}: {response.text}"
-            )
+        system_prompt = "\n\n".join(part for part in system_parts if part).strip()
+        user_prompt = "\n\n".join(part for part in user_parts if part).strip()
 
-        data = response.json()
-        content = data.get("message", {}).get("content")
-
-        if not content:
-            raise AgentExecutionError("Ollama returned an empty response.")
-
-        return content.strip()
+        client = get_bedrock_client()
+        return await client.generate_text(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            temperature=0.0,
+            max_tokens=400,
+        )
 
     async def classify_intent(self, message: str) -> str | None:
         system_prompt = (

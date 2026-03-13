@@ -5,3 +5,4 @@ pydantic-settings
 httpx
 python-dotenv
 httpx==0.28.1
+boto3
