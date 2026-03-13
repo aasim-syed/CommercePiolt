@@ -7,12 +7,14 @@ services:
     container_name: commercepilot-backend
     ports:
       - "8000:8000"
+    env_file:
+      - ./backend/.env
     environment:
       APP_ENV: dev
-      PINE_LABS_BASE_URL: https://sandbox.example.com
-      PINE_LABS_API_KEY: demo-key
     volumes:
       - ./backend/app:/app/app
+      - ./backend/.env:/app/.env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     restart: unless-stopped
 
   frontend:

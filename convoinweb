@@ -228,7 +228,7 @@ Controlled via config:
 
 ```
 
-use_mock_pine_labs = True
+use_mock_pine_labs = False
 
 ```
 
