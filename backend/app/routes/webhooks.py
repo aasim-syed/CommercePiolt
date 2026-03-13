@@ -1,13 +1,16 @@
-# backend/app/routes/webhooks.py
-
 from __future__ import annotations
 
 import json
 
 from fastapi import APIRouter, HTTPException, Request
 
-from app.services.agent import session_store
 from app.services.logger import get_logger
+from app.services.session_store import session_store
+from app.constants import (
+    STATUS_SUCCESS,
+    STATUS_FAILED,
+    STATUS_EXPIRED,
+)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -39,10 +42,10 @@ async def pine_labs_webhook(request: Request) -> dict[str, str]:
     )
 
     status_map = {
-        "payment.success": "SUCCESS",
-        "payment.failed": "FAILED",
-        "payment.expired": "EXPIRED",
-    }
+    "payment.success": STATUS_SUCCESS,
+    "payment.failed": STATUS_FAILED,
+    "payment.expired": STATUS_EXPIRED,
+        }
 
     if payment_ref and event_type in status_map:
         updated = session_store.update_payment_status(

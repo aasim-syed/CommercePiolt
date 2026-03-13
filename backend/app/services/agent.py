@@ -1,5 +1,3 @@
-# backend/app/services/agent.py
-
 from __future__ import annotations
 
 from app.constants import (
@@ -12,11 +10,11 @@ from app.exceptions import AgentExecutionError, ToolValidationError
 from app.schemas.agent import RouteResolution
 from app.services.agent_router import resolve_route
 from app.services.logger import get_logger
-from app.services.session_store import SessionStore
+from app.services.session_store import session_store
 from app.tools.registry import TOOL_REGISTRY
+from app.constants import STATUS_LINK_CREATED
 
 logger = get_logger("agent")
-session_store = SessionStore()
 
 
 async def handle_chat(
@@ -97,7 +95,7 @@ async def handle_chat(
             state.last_payment_ref = result.get("payment_ref")
             state.last_order_id = result.get("order_id")
             state.last_tool_call = CREATE_PAYMENT_LINK
-            state.last_payment_status = result.get("status", "LINK_CREATED")
+            state.last_payment_status = result.get("status", STATUS_LINK_CREATED)
             session_store.update(resolved_session_id, state)
 
             reply = (
@@ -130,7 +128,6 @@ async def handle_chat(
                     None,
                 )
 
-            # If webhook already updated state, use that first for the latest demo behavior
             if state.last_payment_ref == payment_ref and state.last_payment_status:
                 result = {
                     "payment_ref": str(payment_ref),

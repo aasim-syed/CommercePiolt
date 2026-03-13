@@ -6,8 +6,6 @@ from typing import Any
 from app.config import settings
 from app.exceptions import AgentExecutionError
 from app.services.logger import get_logger
-from app.providers.pine_labs_mock import PineLabsMockProvider
-from app.providers.pine_labs_http import PineLabsHttpProvider
 
 logger = get_logger("pine_labs")
 
@@ -101,5 +99,10 @@ pine_labs_client = PineLabsClient()
 
 def get_pine_labs_provider():
     if getattr(settings, "use_mock_pine_labs", True):
+        from app.providers.pine_labs_mock import PineLabsMockProvider
+
         return PineLabsMockProvider()
+
+    from app.providers.pine_labs_http import PineLabsHttpProvider
+
     return PineLabsHttpProvider()

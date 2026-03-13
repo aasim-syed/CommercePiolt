@@ -1,5 +1,3 @@
-# backend/app/services/session_store.py
-
 from __future__ import annotations
 
 from typing import Dict
@@ -48,3 +46,6 @@ class SessionStore:
         state.last_payment_status = status
         self._sessions[session_id] = state
         return True
+
+
+session_store = SessionStore()

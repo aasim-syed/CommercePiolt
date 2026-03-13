@@ -4,7 +4,7 @@ from typing import Any
 
 from app.constants import DEFAULT_CURRENCY
 from app.services.pine_labs import pine_labs_client
-
+from app.constants import STATUS_PENDING
 
 class PineLabsHttpProvider:
     async def create_payment_link(
@@ -46,7 +46,7 @@ class PineLabsHttpProvider:
             f"/payments/{payment_ref}/status",
         )
 
-        status = response.get("status") or current_status or "UNKNOWN"
+        status = response.get("status") or current_status or STATUS_PENDING
 
         return {
             "success": True,
