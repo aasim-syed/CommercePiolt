@@ -1,19 +1,17 @@
-# backend/app/constants.py
+from __future__ import annotations
 
-# Tool names
-CREATE_PAYMENT_LINK = "create_payment_link"
-CHECK_PAYMENT_STATUS = "check_payment_status"
-GET_RESERVE_BALANCE = "get_reserve_balance"
+TOOL_CREATE_PAYMENT_LINK = "create_payment_link"
+TOOL_CHECK_PAYMENT_STATUS = "check_payment_status"
+TOOL_GET_RESERVE_BALANCE = "get_reserve_balance"
 
-# Payment statuses
 STATUS_LINK_CREATED = "LINK_CREATED"
 STATUS_PENDING = "PENDING"
 STATUS_SUCCESS = "SUCCESS"
 STATUS_FAILED = "FAILED"
+STATUS_EXPIRED = "EXPIRED"
 
-# Currency
+WEBHOOK_EVENT_PAYMENT_SUCCESS = "payment.success"
+WEBHOOK_EVENT_PAYMENT_FAILED = "payment.failed"
+WEBHOOK_EVENT_PAYMENT_EXPIRED = "payment.expired"
+
 DEFAULT_CURRENCY = "INR"
-
-# Agent limits
-AGENT_TIMEOUT_SECONDS = 10
-MAX_MESSAGE_LENGTH = 2000

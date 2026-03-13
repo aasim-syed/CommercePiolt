@@ -5,6 +5,10 @@ class Settings(BaseSettings):
     app_name: str = "CommercePilot Backend"
     app_env: str = "dev"
 
+    use_mock_pine_labs: bool = True
+    pine_labs_base_url: str = "https://api-placeholder.pinelabs.com"
+    pine_labs_api_key: str | None = None
+
     pine_labs_base_url: str = "https://sandbox.example.com"
     pine_labs_api_key: str = "demo-key"
     pine_labs_webhook_secret: str = "change-this-secret"

@@ -6,6 +6,8 @@ from typing import Any
 from app.config import settings
 from app.exceptions import AgentExecutionError
 from app.services.logger import get_logger
+from app.providers.pine_labs_mock import PineLabsMockProvider
+from app.providers.pine_labs_http import PineLabsHttpProvider
 
 logger = get_logger("pine_labs")
 
@@ -17,10 +19,12 @@ class PineLabsClient:
         self.timeout = httpx.Timeout(20.0)
 
     def _headers(self) -> dict[str, str]:
-        return {
+        headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}",
         }
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        return headers
 
     async def request(
         self,
@@ -70,7 +74,14 @@ class PineLabsClient:
                 f"Pine Labs API error {response.status_code}: {response.text}"
             )
 
-        data = response.json()
+        try:
+            data = response.json()
+        except ValueError as exc:
+            logger.exception(
+                "pine_labs_invalid_json",
+                extra={"extra_data": {"url": url}},
+            )
+            raise AgentExecutionError("Pine Labs returned invalid JSON.") from exc
 
         logger.info(
             "pine_labs_request_completed",
@@ -86,3 +97,9 @@ class PineLabsClient:
 
 
 pine_labs_client = PineLabsClient()
+
+
+def get_pine_labs_provider():
+    if getattr(settings, "use_mock_pine_labs", True):
+        return PineLabsMockProvider()
+    return PineLabsHttpProvider()
