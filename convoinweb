@@ -1,0 +1,496 @@
+Understood. Below is a **clear execution plan** and a **single “super memory” markdown file** summarizing the current backend architecture and what has been implemented so far. From now on the workflow will be:
+
+1. I tell you **exact next file to create/edit**.
+2. You implement it.
+3. You send the file.
+4. I verify and give the **next file**.
+
+No more looping randomly across files.
+
+---
+
+# Super Memory (Project State)
+
+Create this file:
+
+```
+backend/SUPER_MEMORY_COMMERCEPILOT.md
+```
+
+Contents:
+
+```markdown
+# CommercePilot – System Memory
+
+## Project Goal
+Build an AI-powered payment assistant capable of:
+- Creating payment links
+- Checking payment status
+- Fetching merchant reserve balance
+
+The system supports chat-based interaction and integrates with Pine Labs (mock provider currently).
+
+---
+
+# Current Architecture
+
+Frontend (not started yet)
+↓
+FastAPI Backend
+↓
+Agent Layer
+↓
+Tool Layer
+↓
+Provider Layer
+↓
+Pine Labs HTTP Client
+
+---
+
+# Implemented Components
+
+## 1. API Routes
+
+### /agent/chat
+Main conversational endpoint.
+
+Responsibilities:
+- Accept user message
+- Route intent
+- Execute tool
+- Return structured response
+
+Request:
+```
+
+POST /agent/chat
+{
+"message": "...",
+"session_id": "...",
+"merchant_id": "..."
+}
+
+```
+
+Response contains:
+- assistant reply
+- tool called
+- returned data
+- updated session state
+
+---
+
+### /webhooks/pine-labs
+
+Handles payment provider webhook events.
+
+Supported events:
+- payment.success
+- payment.failed
+- payment.expired
+
+Webhook updates session payment status.
+
+---
+
+### /health
+Simple health check.
+
+---
+
+# Core Backend Layers
+
+## Agent Layer
+
+File:
+```
+
+services/agent.py
+
+```
+
+Responsibilities:
+- session management
+- routing user intent
+- invoking tools
+- updating session state
+
+Session state fields:
+
+```
+
+merchant_id
+last_payment_ref
+last_order_id
+last_payment_status
+last_tool_call
+
+```
+
+---
+
+## Router Layer
+
+File:
+```
+
+services/agent_router.py
+
+```
+
+Determines which tool to execute.
+
+Sources:
+- rule based routing
+- optional LLM fallback
+
+Output:
+```
+
+intent
+args
+route_source
+
+```
+
+---
+
+## Tool Layer
+
+File:
+```
+
+tools/payments.py
+
+```
+
+Thin wrappers calling provider layer.
+
+Functions:
+```
+
+create_payment_link()
+check_payment_status()
+get_reserve_balance()
+
+```
+
+Tools registered in:
+
+```
+
+tools/registry.py
+
+```
+
+Example registry:
+
+```
+
+TOOL_REGISTRY = {
+CREATE_PAYMENT_LINK: create_payment_link,
+CHECK_PAYMENT_STATUS: check_payment_status,
+GET_RESERVE_BALANCE: get_reserve_balance
+}
+
+```
+
+---
+
+## Provider Layer
+
+Abstracts payment provider.
+
+Providers implemented:
+
+```
+
+providers/pine_labs_mock.py
+providers/pine_labs_http.py
+
+```
+
+Provider selection:
+
+```
+
+services/pine_labs.py
+
+```
+```
+
+get_pine_labs_provider()
+
+```
+
+Controlled via config:
+
+```
+
+use_mock_pine_labs = True
+
+```
+
+---
+
+## HTTP Client Layer
+
+File:
+```
+
+services/pine_labs.py
+
+```
+
+Class:
+
+```
+
+PineLabsClient
+
+```
+
+Handles:
+- HTTP requests
+- headers
+- error handling
+- logging
+
+---
+
+# Session System
+
+File:
+```
+
+services/session_store.py
+
+```
+
+In-memory session store.
+
+Used by:
+- agent
+- webhook handler
+
+Features:
+
+```
+
+get_or_create()
+update()
+find_session_by_payment_ref()
+update_payment_status()
+
+```
+
+---
+
+# Mock Provider Behaviour
+
+File:
+```
+
+providers/pine_labs_mock.py
+
+```
+
+Simulates:
+
+create payment link:
+```
+
+payment_ref = pay_xxx
+payment_url = sandbox URL
+status = LINK_CREATED
+
+```
+
+status check:
+```
+
+returns session status
+
+```
+
+reserve balance:
+```
+
+returns static balance
+
+```
+
+---
+
+# Webhook Flow
+
+Webhook payload:
+
+```
+
+{
+"event": "payment.success",
+"data": {
+"payment_ref": "pay_xxx"
+}
+}
+
+```
+
+Mapping:
+
+```
+
+payment.success → SUCCESS
+payment.failed → FAILED
+payment.expired → EXPIRED
+
+```
+
+Webhook updates session store.
+
+---
+
+# End-to-End Flow
+
+1 User sends chat message  
+2 Agent resolves intent  
+3 Tool executed  
+4 Provider returns result  
+5 Session state updated  
+6 Response returned  
+
+Later:
+
+7 Webhook arrives  
+8 Session status updated  
+9 Status check returns updated state
+
+---
+
+# Current Backend Completion Level
+
+Prototype Level: COMPLETE
+
+Working components:
+
+- routing
+- tools
+- providers
+- webhook handling
+- session state
+- chat endpoint
+
+Missing for production:
+
+- persistent database
+- payment tables
+- webhook event storage
+- signature verification
+- idempotency
+- authentication
+- rate limiting
+
+---
+
+# Next Phase
+
+Frontend Integration
+
+Goal:
+Build UI that interacts with `/agent/chat`.
+
+Features needed:
+
+- chat interface
+- payment link display
+- status display
+- reserve balance display
+- session debug view
+
+---
+
+# Long Term Architecture
+
+Frontend (React)
+↓
+API Gateway
+↓
+Agent Service
+↓
+Tool Layer
+↓
+Provider Layer
+↓
+Payment Provider
+
+Database Layer (future):
+- payments
+- webhook_events
+- conversations
+```
+
+---
+
+# From Now On — Execution Plan
+
+We will proceed **file by file**.
+
+### Step 1 (Next File)
+
+Create frontend project.
+
+I will give you the **exact files for:**
+
+```
+frontend/
+src/
+App.tsx
+api/chat.ts
+components/ChatUI.tsx
+```
+
+These will connect to:
+
+```
+POST /agent/chat
+```
+
+---
+
+### Step 2
+
+Build chat UI.
+
+---
+
+### Step 3
+
+Render tool results.
+
+---
+
+### Step 4
+
+Add webhook simulator UI.
+
+---
+
+### Step 5
+
+Add payment status updates.
+
+---
+
+# Immediate Next File
+
+Next I will give:
+
+```
+frontend/src/api/chat.ts
+```
+
+This file will be the **frontend API client for `/agent/chat`**.
+
+Say **"next"** and I will give that file.
