@@ -8,13 +8,6 @@ from app.schemas.agent import SessionState
 
 
 class SessionStore:
-    """
-    In-memory session store.
-
-    Can later be replaced by Redis or DB-backed storage
-    without changing agent orchestration code.
-    """
-
     def __init__(self) -> None:
         self._sessions: Dict[str, SessionState] = {}
 
@@ -39,3 +32,19 @@ class SessionStore:
 
     def clear(self) -> None:
         self._sessions.clear()
+
+    def find_session_by_payment_ref(self, payment_ref: str) -> tuple[str, SessionState] | None:
+        for session_id, state in self._sessions.items():
+            if state.last_payment_ref == payment_ref:
+                return session_id, state
+        return None
+
+    def update_payment_status(self, payment_ref: str, status: str) -> bool:
+        found = self.find_session_by_payment_ref(payment_ref)
+        if not found:
+            return False
+
+        session_id, state = found
+        state.last_payment_status = status
+        self._sessions[session_id] = state
+        return True

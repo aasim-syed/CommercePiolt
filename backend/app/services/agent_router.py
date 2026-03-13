@@ -1,3 +1,5 @@
+# backend/app/services/agent_router.py
+
 from __future__ import annotations
 
 import re
@@ -26,10 +28,7 @@ def extract_payment_ref_rule_based(message: str) -> str | None:
 
 
 def detect_intent_rule_based(message: str) -> str | None:
-    text = message.lower()
-
-    if "payment link" in text or "collect" in text or "pay" in text:
-        return CREATE_PAYMENT_LINK
+    text = message.lower().strip()
 
     if "status" in text:
         return CHECK_PAYMENT_STATUS
@@ -37,7 +36,27 @@ def detect_intent_rule_based(message: str) -> str | None:
     if "balance" in text or "reserve" in text:
         return GET_RESERVE_BALANCE
 
+    if "payment link" in text or "collect" in text or "pay " in text or text.startswith("pay"):
+        return CREATE_PAYMENT_LINK
+
     return None
+
+
+def _clean_args(args: dict[str, Any]) -> dict[str, Any]:
+    cleaned: dict[str, Any] = {}
+
+    for key, value in args.items():
+        if value is None:
+            continue
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped or stripped.lower() == "null":
+                continue
+            cleaned[key] = stripped
+        else:
+            cleaned[key] = value
+
+    return cleaned
 
 
 async def resolve_route(
@@ -71,9 +90,6 @@ async def resolve_route(
         if payment_ref is not None:
             args["payment_ref"] = payment_ref
 
-    elif intent == GET_RESERVE_BALANCE:
-        pass
-
     missing_required = False
 
     if intent == CREATE_PAYMENT_LINK and args.get("amount") is None:
@@ -96,22 +112,3 @@ async def resolve_route(
         "source": source,
         "args": args,
     }
-
-
-def _clean_args(args: dict[str, Any]) -> dict[str, Any]:
-    cleaned: dict[str, Any] = {}
-
-    for key, value in args.items():
-        if value is None:
-            continue
-
-        if isinstance(value, str):
-            stripped = value.strip()
-            if not stripped or stripped.lower() == "null":
-                continue
-            cleaned[key] = stripped
-            continue
-
-        cleaned[key] = value
-
-    return cleaned

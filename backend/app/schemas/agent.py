@@ -1,3 +1,5 @@
+# backend/app/schemas/agent.py
+
 from __future__ import annotations
 
 from typing import Any
@@ -10,6 +12,7 @@ class SessionState(BaseModel):
     last_payment_ref: str | None = None
     last_order_id: str | None = None
     last_tool_call: str | None = None
+    last_payment_status: str | None = None
 
 
 class RouteResolution(BaseModel):

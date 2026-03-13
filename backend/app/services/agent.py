@@ -9,7 +9,7 @@ from app.constants import (
     MAX_MESSAGE_LENGTH,
 )
 from app.exceptions import AgentExecutionError, ToolValidationError
-from app.schemas.agent import RouteResolution, SessionState
+from app.schemas.agent import RouteResolution
 from app.services.agent_router import resolve_route
 from app.services.logger import get_logger
 from app.services.session_store import SessionStore
@@ -70,8 +70,7 @@ async def handle_chat(
 
         if route.intent is None:
             return (
-                "I can help with creating payment links, checking payment status, "
-                "and fetching reserve balance.",
+                "I can help with creating payment links, checking payment status, and fetching reserve balance.",
                 None,
                 state.model_dump(),
                 None,
@@ -98,19 +97,8 @@ async def handle_chat(
             state.last_payment_ref = result.get("payment_ref")
             state.last_order_id = result.get("order_id")
             state.last_tool_call = CREATE_PAYMENT_LINK
+            state.last_payment_status = result.get("status", "LINK_CREATED")
             session_store.update(resolved_session_id, state)
-
-            logger.info(
-                "tool_executed",
-                extra={
-                    "extra_data": {
-                        "session_id": resolved_session_id,
-                        "tool_name": CREATE_PAYMENT_LINK,
-                        "payment_ref": result.get("payment_ref"),
-                        "order_id": result.get("order_id"),
-                    }
-                },
-            )
 
             reply = (
                 f"Created payment link for ₹{result['amount']:.2f}. "
@@ -118,18 +106,16 @@ async def handle_chat(
                 f"URL: {result['payment_url']}"
             )
 
-            tool_called = {
-                "tool_name": CREATE_PAYMENT_LINK,
-                "arguments": {
-                    "amount": float(amount),
-                    "merchant_id": merchant_for_call,
-                    "route_source": route.source,
-                },
-            }
-
             return (
                 reply,
-                tool_called,
+                {
+                    "tool_name": CREATE_PAYMENT_LINK,
+                    "arguments": {
+                        "amount": float(amount),
+                        "merchant_id": merchant_for_call,
+                        "route_source": route.source,
+                    },
+                },
                 state.model_dump(),
                 result,
             )
@@ -144,37 +130,31 @@ async def handle_chat(
                     None,
                 )
 
-            tool = TOOL_REGISTRY[CHECK_PAYMENT_STATUS]
-            result = await tool(payment_ref=str(payment_ref))
+            # If webhook already updated state, use that first for the latest demo behavior
+            if state.last_payment_ref == payment_ref and state.last_payment_status:
+                result = {
+                    "payment_ref": str(payment_ref),
+                    "status": state.last_payment_status,
+                }
+            else:
+                tool = TOOL_REGISTRY[CHECK_PAYMENT_STATUS]
+                result = await tool(payment_ref=str(payment_ref))
 
             state.last_tool_call = CHECK_PAYMENT_STATUS
+            state.last_payment_status = result.get("status")
             session_store.update(resolved_session_id, state)
-
-            logger.info(
-                "tool_executed",
-                extra={
-                    "extra_data": {
-                        "session_id": resolved_session_id,
-                        "tool_name": CHECK_PAYMENT_STATUS,
-                        "payment_ref": str(payment_ref),
-                        "status": result.get("status"),
-                    }
-                },
-            )
 
             reply = f"Payment {payment_ref} status: {result['status']}."
 
-            tool_called = {
-                "tool_name": CHECK_PAYMENT_STATUS,
-                "arguments": {
-                    "payment_ref": str(payment_ref),
-                    "route_source": route.source,
-                },
-            }
-
             return (
                 reply,
-                tool_called,
+                {
+                    "tool_name": CHECK_PAYMENT_STATUS,
+                    "arguments": {
+                        "payment_ref": str(payment_ref),
+                        "route_source": route.source,
+                    },
+                },
                 state.model_dump(),
                 result,
             )
@@ -188,33 +168,20 @@ async def handle_chat(
             state.last_tool_call = GET_RESERVE_BALANCE
             session_store.update(resolved_session_id, state)
 
-            logger.info(
-                "tool_executed",
-                extra={
-                    "extra_data": {
-                        "session_id": resolved_session_id,
-                        "tool_name": GET_RESERVE_BALANCE,
-                        "merchant_id": merchant_for_call,
-                    }
-                },
-            )
-
             reply = (
                 f"Your reserve balance is "
                 f"₹{result['available_balance']:.2f} {result['currency']}."
             )
 
-            tool_called = {
-                "tool_name": GET_RESERVE_BALANCE,
-                "arguments": {
-                    "merchant_id": merchant_for_call,
-                    "route_source": route.source,
-                },
-            }
-
             return (
                 reply,
-                tool_called,
+                {
+                    "tool_name": GET_RESERVE_BALANCE,
+                    "arguments": {
+                        "merchant_id": merchant_for_call,
+                        "route_source": route.source,
+                    },
+                },
                 state.model_dump(),
                 result,
             )

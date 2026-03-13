@@ -1,3 +1,5 @@
+# backend/app/services/llm_router.py
+
 from __future__ import annotations
 
 import json
@@ -9,6 +11,7 @@ from app.constants import (
     GET_RESERVE_BALANCE,
 )
 from app.services.llm_client import LLMClient
+from app.services.logger import get_logger
 
 SUPPORTED_TOOLS = {
     CREATE_PAYMENT_LINK,
@@ -16,15 +19,26 @@ SUPPORTED_TOOLS = {
     GET_RESERVE_BALANCE,
 }
 
+logger = get_logger("llm_router")
+
 
 class LLMRouter:
     def __init__(self) -> None:
         self.client = LLMClient()
 
     async def detect_intent(self, message: str) -> str | None:
-        intent = await self.client.classify_intent(message)
+        try:
+            intent = await self.client.classify_intent(message)
+        except Exception:
+            logger.exception(
+                "llm_intent_detection_failed",
+                extra={"extra_data": {"message": message}},
+            )
+            return None
+
         if intent not in SUPPORTED_TOOLS:
             return None
+
         return intent
 
     async def extract_tool_args(
@@ -42,36 +56,20 @@ class LLMRouter:
             prompt = (
                 "Extract arguments for tool create_payment_link.\n"
                 "Return strict JSON only.\n"
-                "Schema:\n"
-                '{"amount": number|null, "merchant_id": string|null}\n'
-                "Rules:\n"
-                "- amount must be numeric if present\n"
-                "- merchant_id can be null if not present in message\n"
-                "- no explanation, no markdown"
+                '{"amount": number|null, "merchant_id": string|null}'
             )
-
         elif tool_name == CHECK_PAYMENT_STATUS:
             prompt = (
                 "Extract arguments for tool check_payment_status.\n"
                 "Return strict JSON only.\n"
-                "Schema:\n"
-                '{"payment_ref": string|null}\n'
-                "Rules:\n"
-                "- payment_ref should look like pay_xxx if present\n"
-                "- no explanation, no markdown"
+                '{"payment_ref": string|null}'
             )
-
         elif tool_name == GET_RESERVE_BALANCE:
             prompt = (
                 "Extract arguments for tool get_reserve_balance.\n"
                 "Return strict JSON only.\n"
-                "Schema:\n"
-                '{"merchant_id": string|null}\n'
-                "Rules:\n"
-                "- merchant_id can be null if not present in message\n"
-                "- no explanation, no markdown"
+                '{"merchant_id": string|null}'
             )
-
         else:
             return {}
 
@@ -81,15 +79,28 @@ class LLMRouter:
                 "merchant_id": state.get("merchant_id"),
                 "last_payment_ref": state.get("last_payment_ref"),
                 "last_order_id": state.get("last_order_id"),
+                "last_payment_status": state.get("last_payment_status"),
             },
         }
 
-        raw = await self.client.chat(
-            [
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": json.dumps(user_payload)},
-            ]
-        )
+        try:
+            raw = await self.client.chat(
+                [
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": json.dumps(user_payload)},
+                ]
+            )
+        except Exception:
+            logger.exception(
+                "llm_arg_extraction_failed",
+                extra={
+                    "extra_data": {
+                        "tool_name": tool_name,
+                        "message": message,
+                    }
+                },
+            )
+            return {}
 
         return self._safe_parse_json(raw)
 

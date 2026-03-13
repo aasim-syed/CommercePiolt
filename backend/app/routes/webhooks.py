@@ -1,12 +1,12 @@
+# backend/app/routes/webhooks.py
+
 from __future__ import annotations
 
-import hmac
-import hashlib
 import json
 
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 
-from app.config import settings
+from app.services.agent import session_store
 from app.services.logger import get_logger
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
@@ -14,70 +14,51 @@ router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 logger = get_logger("webhooks")
 
 
-def verify_signature(payload: bytes, signature: str) -> bool:
-    secret = settings.pine_labs_webhook_secret
-
-    computed = hmac.new(
-        key=secret.encode(),
-        msg=payload,
-        digestmod=hashlib.sha256,
-    ).hexdigest()
-
-    return hmac.compare_digest(computed, signature)
-
-
 @router.post("/pine-labs")
-async def pine_labs_webhook(
-    request: Request,
-    x_signature: str | None = Header(default=None),
-):
+async def pine_labs_webhook(request: Request) -> dict[str, str]:
     raw_body = await request.body()
-
-    if not x_signature:
-        raise HTTPException(status_code=400, detail="Missing webhook signature")
-
-    if not verify_signature(raw_body, x_signature):
-        raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
     try:
         payload = json.loads(raw_body)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON") from exc
 
     event_type = payload.get("event")
+    data = payload.get("data", {})
+    payment_ref = data.get("payment_ref")
 
     logger.info(
         "webhook_received",
         extra={
             "extra_data": {
                 "event": event_type,
+                "payment_ref": payment_ref,
                 "payload": payload,
             }
         },
     )
 
-    if event_type == "payment.success":
-        payment_ref = payload["data"]["payment_ref"]
+    status_map = {
+        "payment.success": "SUCCESS",
+        "payment.failed": "FAILED",
+        "payment.expired": "EXPIRED",
+    }
 
-        logger.info(
-            "payment_success",
-            extra={"extra_data": {"payment_ref": payment_ref}},
+    if payment_ref and event_type in status_map:
+        updated = session_store.update_payment_status(
+            payment_ref=payment_ref,
+            status=status_map[event_type],
         )
 
-    elif event_type == "payment.failed":
-        payment_ref = payload["data"]["payment_ref"]
-
         logger.info(
-            "payment_failed",
-            extra={"extra_data": {"payment_ref": payment_ref}},
-        )
-
-    elif event_type == "payment.expired":
-        payment_ref = payload["data"]["payment_ref"]
-
-        logger.info(
-            "payment_expired",
-            extra={"extra_data": {"payment_ref": payment_ref}},
+            "webhook_payment_status_updated",
+            extra={
+                "extra_data": {
+                    "payment_ref": payment_ref,
+                    "status": status_map[event_type],
+                    "session_updated": updated,
+                }
+            },
         )
 
     return {"status": "ok"}
