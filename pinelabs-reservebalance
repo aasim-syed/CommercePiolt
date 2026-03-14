@@ -1,0 +1,105 @@
+Check Point Balance API Overview
+
+
+• Endpoint URL: `/payment-option`
+• HTTP Method: `POST`
+• Authentication: Bearer Token
+
+Request Example
+
+
+Here’s how you can make a request to check the point balance:
+
+bash
+Copy
+curl -X POST \
+  https://pluraluat.v2.pinepg.in/payment-option \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -d '{
+    "payment_option": {
+      "points_card_details": {
+        "card_last4": "1112",
+        "card_number": "4012001037141112",
+        "registered_mobile_number": "7827709063"
+      }
+    },
+    "order_details": {
+      "order_amount": {
+        "value": 5000,
+        "currency": "INR"
+      }
+    }
+  }'
+
+
+
+Request Parameters
+
+
+• payment_option: Contains details about the points card.
+• points_card_details:
+• `card_last4` (string): Last four digits of the card.
+• `card_number` (string): Full card number.
+• `registered_mobile_number` (string): Mobile number registered with the card.
+• order_details: Contains details about the order.
+• order_amount:
+• `value` (integer): Amount for the order.
+• `currency` (string): Currency type (e.g., "INR").
+
+Sample Response
+
+
+A successful response will look like this:
+
+json
+Copy
+{
+  "balance": {
+    "value": 23718050,
+    "currency": "INR"
+  },
+  "redeemable_amount": {
+    "value": 3500,
+    "currency": "INR"
+  },
+  "redeemable_points": 140,
+  "is_eligible": true
+}
+
+
+
+Response Parameters
+
+
+• balance:
+• `value` (integer): Total balance available on the card.
+• `currency` (string): Currency type.
+• redeemable_amount:
+• `value` (integer): Amount that can be redeemed.
+• `currency` (string): Currency type.
+• redeemable_points (integer): Total redeemable points available on the card.
+• is_eligible (boolean): Indicates if the card is eligible for redemption.
+
+Error Handling
+
+
+Make sure to handle potential errors, such as:
+
+• 400 Bad Request: Invalid input parameters.
+• 401 Unauthorized: Invalid or missing authentication token.
+• 422 Unprocessable Entity: Validation errors.
+• 500 Internal Server Error: Server-side issues.
+
+Security Considerations
+
+
+• Always use HTTPS for API calls to ensure data security.
+• Store your API tokens securely and do not expose them in your code.
+
+---
+
+References:
+• Check Point Balance API - Documentation for checking point balances and eligibility.
+• Pay by Points Overview - General information on the Pay by Points feature.
+

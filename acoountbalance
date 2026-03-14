@@ -1,0 +1,71 @@
+Get Account Balance
+get
+https://plural-uat.v2.pinepg.in/payouts/v3/payments/funding-account
+
+Use this API to fetch the account balance linked to Pine Labs Online account.
+
+Environment
+Use our UAT environment endpoint for testing and for integration utilize our production endpoint.
+
+Environment	Endpoints
+User Acceptance Testing [UAT]	https://plural-uat.v2.pinepg.in/payouts/v3/payments/funding-account
+Production [PROD]	https://api.pluralpay.in/payouts/v3/payments/funding-account
+📘
+Note:
+
+You can use this API only when you have a funding account linked to the Pine Labs Online account.
+Headers
+Content-Type
+string
+Defaults to application/json
+The type of content included in the HTTP message body.
+
+Possible value: application/json.
+
+application/json
+Authorization
+string
+required
+Defaults to Bearer
+The HTTP header where you can include your secret token for authentication.
+
+Example: Bearer <access_token>
+
+Note: Use the access token generated using our Generate Token API.
+
+Bearer
+Request-Timestamp
+string
+Use ISO 8601 UTC Timestamp, to create a timestamp when the generate token is requested.
+
+Example: 2024-07-09T07:57:08.022Z
+
+Request-ID
+string
+Use a global unique identifier [GUID] for the request.
+
+Minimum: 1 characters.
+Maximum: 50 characters
+Example: c17ce30f-f88e-4f81-ada1-c3b4909ed235
+Responses
+
+200
+200
+
+Response body
+object
+accountNumber
+string
+branchCode
+string
+balance
+object
+currency
+string
+value
+integer
+Defaults to 0
+
+400
+400
+

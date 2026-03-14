@@ -141,10 +141,9 @@ class PineLabsHTTPProvider:
 
         response = await pine_labs_client.request(
             "GET",
-            "/api/merchant/v1/balance",
+            "/payouts/v3/payments/funding-account",
         )
-        response_data = response.get("data", {})
-        balance = response_data.get("balance", {})
+        balance = response.get("balance", {})
 
         return {
             "success": True,
