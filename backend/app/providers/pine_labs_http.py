@@ -105,10 +105,19 @@ class PineLabsHTTPProvider:
         if not payment_ref:
             raise AgentExecutionError("payment_ref is required to check payment status")
 
-        response = await pine_labs_client.request(
-            "GET",
-            f"/api/pay/v1/payment/{payment_ref}",
-        )
+        try:
+            response = await pine_labs_client.request(
+                "GET",
+                f"/api/pay/v1/payment/{payment_ref}",
+            )
+        except AgentExecutionError as exc:
+            if "status 404" not in str(exc):
+                raise
+
+            response = await pine_labs_client.request(
+                "GET",
+                f"/api/pay/v1/paymentlink/{payment_ref}",
+            )
 
         response_data = response.get("data", {})
         status = response.get("status") or response_data.get("status") or current_status or STATUS_PENDING
