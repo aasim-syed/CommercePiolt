@@ -14,18 +14,13 @@ logger = get_logger("bedrock")
 
 class BedrockClient:
     def __init__(self) -> None:
-        self._client = None
+        self.client = boto3.client(
+            "bedrock-runtime",
+            region_name=settings.aws_region,
+            aws_access_key_id=settings.aws_access_key_id,
+            aws_secret_access_key=settings.aws_secret_access_key,
+        )
         self.model_id = settings.bedrock_model_id
-
-    def _get_client(self):
-        if self._client is None:
-            self._client = boto3.client(
-                "bedrock-runtime",
-                region_name=settings.aws_region,
-                aws_access_key_id=settings.aws_access_key_id,
-                aws_secret_access_key=settings.aws_secret_access_key,
-            )
-        return self._client
 
     async def generate_text(
         self,
@@ -64,8 +59,7 @@ class BedrockClient:
         )
 
         try:
-            client = self._get_client()
-            response = client.invoke_model(
+            response = self.client.invoke_model(
                 modelId=self.model_id,
                 body=json.dumps(body),
             )

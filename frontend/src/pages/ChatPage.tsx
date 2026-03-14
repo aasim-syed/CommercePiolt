@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 
-import { sendChat, type ChatResponse } from "../lib/api";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import { Textarea } from "../components/ui/textarea";
+import { sendChat, type ChatResponse } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 type Message = {
   id: string;
@@ -17,10 +17,44 @@ type Message = {
 const starterPrompts = [
   "Create payment link for 1200",
   "What is my reserve balance?",
-  "Check status for pay_abc123",
+  "Check payment status",
 ];
 
-export function ChatPage() {
+function formatToolData(data: Record<string, unknown> | null | undefined): string | null {
+  if (!data) return null;
+
+  const paymentUrl =
+    typeof data.payment_url === "string" && data.payment_url.trim()
+      ? data.payment_url.trim()
+      : null;
+  const paymentRef =
+    typeof data.payment_ref === "string" && data.payment_ref.trim()
+      ? data.payment_ref.trim()
+      : null;
+  const status =
+    typeof data.status === "string" && data.status.trim() ? data.status.trim() : null;
+  const availableBalance =
+    typeof data.available_balance === "number" || typeof data.available_balance === "string"
+      ? String(data.available_balance)
+      : null;
+  const currency =
+    typeof data.currency === "string" && data.currency.trim() ? data.currency.trim() : "INR";
+
+  if (paymentUrl || paymentRef || status || availableBalance) {
+    const parts: string[] = [];
+
+    if (paymentRef) parts.push(`Payment Ref: ${paymentRef}`);
+    if (status) parts.push(`Status: ${status}`);
+    if (availableBalance) parts.push(`Reserve Balance: ${availableBalance} ${currency}`);
+    if (paymentUrl) parts.push(`Payment URL: ${paymentUrl}`);
+
+    return parts.join("\n");
+  }
+
+  return JSON.stringify(data, null, 2);
+}
+
+export default function ChatPage() {
   const [sessionId, setSessionId] = useState("s1");
   const [merchantId, setMerchantId] = useState("m123");
   const [message, setMessage] = useState("");
@@ -30,7 +64,7 @@ export function ChatPage() {
       id: "welcome",
       role: "assistant",
       content:
-        "I can help with payment links, payment status, and reserve balance. Try one of the prompts on the left.",
+        "I can help with payment links, payment status, and reserve balance. Try one of the prompts below.",
     },
   ]);
 
@@ -57,15 +91,16 @@ export function ChatPage() {
         merchant_id: merchantId.trim() || undefined,
       });
 
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: response.reply,
-        toolCalled: response.tool_called,
-        data: response.data,
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: response.reply,
+          toolCalled: response.tool_called,
+          data: response.data,
+        },
+      ]);
     } catch (error) {
       const err =
         error instanceof Error ? error.message : "Unknown error while calling backend.";
@@ -84,80 +119,111 @@ export function ChatPage() {
   }
 
   return (
-    <div className="grid">
-      <aside className="card sidebar">
-        <h2>Starter prompts</h2>
-        <p>
-          Minimal chat UI using shadcn-style local components. Replace the mock backend
-          tools later with real Pine Labs API integration.
+    <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+      <aside className="rounded-3xl border bg-card/85 p-6 shadow-xl shadow-primary/5 backdrop-blur">
+        <h2 className="text-lg font-semibold">Starter prompts</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Minimal chat UI wired to the FastAPI backend for the three supported flows.
         </p>
 
-        <div className="pill-list">
+        <div className="mt-5 flex flex-col gap-2.5">
           {starterPrompts.map((prompt) => (
-            <button
+            <Button
               key={prompt}
-              className="pill"
-              onClick={() => void handleSubmit(prompt)}
               type="button"
+              variant="outline"
+              className="h-auto justify-start rounded-2xl px-4 py-3 text-left whitespace-normal"
+              onClick={() => void handleSubmit(prompt)}
+              disabled={loading}
             >
               {prompt}
-            </button>
+            </Button>
           ))}
         </div>
 
-        <div style={{ marginTop: 20 }}>
-          <h2 style={{ marginBottom: 10 }}>Supported actions</h2>
-          <div className="pill-list">
-            <span className="pill">Create payment link</span>
-            <span className="pill">Check payment status</span>
-            <span className="pill">Get reserve balance</span>
+        <div className="mt-6">
+          <h3 className="text-sm font-medium">Supported actions</h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="rounded-full border bg-secondary px-3 py-1 text-xs text-secondary-foreground">
+              Create payment link
+            </span>
+            <span className="rounded-full border bg-secondary px-3 py-1 text-xs text-secondary-foreground">
+              Check payment status
+            </span>
+            <span className="rounded-full border bg-secondary px-3 py-1 text-xs text-secondary-foreground">
+              Get reserve balance
+            </span>
           </div>
         </div>
       </aside>
 
-      <section className="card chat-panel">
-        <div className="chat-header">
-          <h2>Agent chat</h2>
-          <p>Frontend sends chat messages to FastAPI and renders tool-call results.</p>
+      <section className="flex min-h-[75vh] flex-col rounded-3xl border bg-card/90 shadow-xl shadow-primary/5 backdrop-blur">
+        <div className="border-b px-6 py-5">
+          <h2 className="text-lg font-semibold">Agent chat</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Frontend sends chat messages to FastAPI and renders tool-call results.
+          </p>
         </div>
 
-        <div className="messages">
-          {messages.length === 0 ? (
-            <div className="empty">No messages yet.</div>
-          ) : (
-            messages.map((item) => (
-              <div key={item.id} className={`message-row ${item.role}`}>
-                <div className={`bubble ${item.role}`}>
-                  {item.content}
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
+          {messages.map((item) => {
+            const formattedData = formatToolData(item.data);
+
+            return (
+              <div
+                key={item.id}
+                className={`flex ${item.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[85%] rounded-2xl border px-4 py-3 text-sm shadow-sm ${
+                    item.role === "user"
+                      ? "border-primary/30 bg-primary text-primary-foreground"
+                      : "bg-background/70"
+                  }`}
+                >
+                  <div>{item.content}</div>
 
                   {item.toolCalled ? (
-                    <div className="tool-box">
-                      <strong>Tool:</strong> {item.toolCalled.tool_name}
-                      <br />
-                      <strong>Args:</strong> {JSON.stringify(item.toolCalled.arguments)}
+                    <div className="mt-3 rounded-xl border bg-muted/60 p-3">
+                      <div>
+                        <strong>Tool:</strong> {item.toolCalled.tool_name}
+                      </div>
+                      <div className="mt-1 break-all text-xs text-muted-foreground">
+                        <strong>Args:</strong> {JSON.stringify(item.toolCalled.arguments)}
+                      </div>
                     </div>
                   ) : null}
 
-                  {item.data ? (
-                    <div className="meta">Data: {JSON.stringify(item.data)}</div>
+                  {formattedData ? (
+                    <pre className="mt-3 whitespace-pre-wrap rounded-xl border bg-muted/60 p-3 text-xs text-muted-foreground">
+                      {formattedData}
+                    </pre>
+                  ) : null}
+
+                  {typeof item.data?.payment_url === "string" && item.data.payment_url ? (
+                    <div className="mt-3 text-xs">
+                      <a href={item.data.payment_url} target="_blank" rel="noreferrer">
+                        Open payment link
+                      </a>
+                    </div>
                   ) : null}
                 </div>
               </div>
-            ))
-          )}
+            );
+          })}
 
           {loading ? (
-            <div className="message-row assistant">
-              <div className="bubble assistant">
-                <Loader2 size={16} style={{ verticalAlign: "middle", marginRight: 8 }} />
+            <div className="flex justify-start">
+              <div className="rounded-2xl border bg-background/70 px-4 py-3 text-sm shadow-sm">
+                <Loader2 className="mr-2 inline-block size-4 animate-spin align-text-bottom" />
                 Processing request...
               </div>
             </div>
           ) : null}
         </div>
 
-        <div className="composer">
-          <div className="row">
+        <div className="border-t p-6">
+          <div className="grid gap-3 md:grid-cols-2">
             <Input
               placeholder="Session ID"
               value={sessionId}
@@ -171,20 +237,27 @@ export function ChatPage() {
           </div>
 
           <Textarea
+            className="mt-3"
             placeholder="Type something like: create payment link for 1200"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                e.preventDefault();
+                void handleSubmit();
+              }
+            }}
           />
 
-          <Button disabled={!canSend} onClick={() => void handleSubmit()}>
+          <Button className="mt-3" disabled={!canSend} onClick={() => void handleSubmit()}>
             {loading ? (
               <>
-                <Loader2 size={16} style={{ verticalAlign: "middle", marginRight: 8 }} />
+                <Loader2 className="size-4 animate-spin" />
                 Sending...
               </>
             ) : (
               <>
-                <Sparkles size={16} style={{ verticalAlign: "middle", marginRight: 8 }} />
+                <Sparkles className="size-4" />
                 Send message
               </>
             )}

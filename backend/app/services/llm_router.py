@@ -1,5 +1,3 @@
-# backend/app/services/llm_router.py
-
 from __future__ import annotations
 
 import json
@@ -55,19 +53,22 @@ class LLMRouter:
         if tool_name == CREATE_PAYMENT_LINK:
             prompt = (
                 "Extract arguments for tool create_payment_link.\n"
-                "Return strict JSON only.\n"
+                "Return ONLY strict JSON.\n"
+                "Do not include markdown. Do not include explanation.\n"
                 '{"amount": number|null, "merchant_id": string|null}'
             )
         elif tool_name == CHECK_PAYMENT_STATUS:
             prompt = (
                 "Extract arguments for tool check_payment_status.\n"
-                "Return strict JSON only.\n"
+                "Return ONLY strict JSON.\n"
+                "Do not include markdown. Do not include explanation.\n"
                 '{"payment_ref": string|null}'
             )
         elif tool_name == GET_RESERVE_BALANCE:
             prompt = (
                 "Extract arguments for tool get_reserve_balance.\n"
-                "Return strict JSON only.\n"
+                "Return ONLY strict JSON.\n"
+                "Do not include markdown. Do not include explanation.\n"
                 '{"merchant_id": string|null}'
             )
         else:

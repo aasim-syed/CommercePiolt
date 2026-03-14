@@ -1,5 +1,3 @@
-# backend/app/routes/chat.py
-
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
@@ -41,6 +39,15 @@ async def chat(payload: ChatRequest) -> ChatResponse:
     except Exception as exc:
         logger.exception(
             "chat_endpoint_failure",
-            extra={"extra_data": {"message": payload.message}},
+            extra={
+                "extra_data": {
+                    "message": payload.message,
+                    "session_id": payload.session_id,
+                    "merchant_id": payload.merchant_id,
+                }
+            },
         )
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=500,
+            detail="Unexpected server error",
+        ) from exc
