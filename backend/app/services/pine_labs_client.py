@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
@@ -13,14 +14,95 @@ logger = get_logger("pine_labs")
 
 class PineLabsClient:
     def __init__(self) -> None:
-        self.base_url = settings.pine_labs_base_url.rstrip("/")
+        self.base_url = (settings.pine_labs_base_url or "").rstrip("/")
         self.api_key = settings.pine_labs_api_key
+        self.client_id = settings.pine_labs_client_id
+        self.client_secret = settings.pine_labs_client_secret
+        self.grant_type = settings.pine_labs_grant_type or "client_credentials"
         self.timeout = httpx.Timeout(20.0)
+        self._access_token: str | None = None
+        self._token_expires_at: datetime | None = None
 
-    def _headers(self) -> dict[str, str]:
+    async def _get_access_token(self) -> str:
+        if self.api_key:
+            return self.api_key
+
+        if (
+            self._access_token
+            and self._token_expires_at
+            and datetime.now(timezone.utc) < self._token_expires_at
+        ):
+            return self._access_token
+
+        if not self.base_url or not self.client_id or not self.client_secret:
+            raise AgentExecutionError("Pine Labs credentials are incomplete")
+
+        token_url = f"{self.base_url}/api/auth/v1/token"
+        payload = {
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "grant_type": self.grant_type,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(
+                    token_url,
+                    headers={"Content-Type": "application/json"},
+                    json=payload,
+                )
+        except httpx.RequestError as exc:
+            logger.exception(
+                "pine_labs_token_network_error",
+                extra={"extra_data": {"url": token_url}},
+            )
+            raise AgentExecutionError("Unable to reach Pine Labs auth service") from exc
+
+        if response.status_code >= 400:
+            logger.error(
+                "pine_labs_token_error",
+                extra={
+                    "extra_data": {
+                        "url": token_url,
+                        "status_code": response.status_code,
+                        "response": response.text,
+                    }
+                },
+            )
+            raise AgentExecutionError(
+                f"Pine Labs auth failed with status {response.status_code}"
+            )
+
+        try:
+            data = response.json()
+        except ValueError as exc:
+            logger.error(
+                "pine_labs_token_invalid_json",
+                extra={"extra_data": {"url": token_url, "response": response.text}},
+            )
+            raise AgentExecutionError("Pine Labs auth returned an invalid response") from exc
+
+        access_token = (
+            data.get("access_token")
+            or data.get("token")
+            or data.get("data", {}).get("access_token")
+        )
+        if not access_token:
+            raise AgentExecutionError("Pine Labs auth did not return an access token")
+
+        expires_in = data.get("expires_in")
+        ttl_seconds = int(expires_in) if isinstance(expires_in, (int, float, str)) and str(expires_in).isdigit() else 1800
+        self._access_token = str(access_token)
+        self._token_expires_at = datetime.now(timezone.utc) + timedelta(
+            seconds=max(ttl_seconds - 60, 60)
+        )
+        return self._access_token
+
+    async def _headers(self) -> dict[str, str]:
+        token = await self._get_access_token()
         return {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {token}",
         }
 
     async def request(
@@ -47,7 +129,7 @@ class PineLabsClient:
                 response = await client.request(
                     method=method.upper(),
                     url=url,
-                    headers=self._headers(),
+                    headers=await self._headers(),
                     json=payload,
                 )
         except httpx.RequestError as exc:
