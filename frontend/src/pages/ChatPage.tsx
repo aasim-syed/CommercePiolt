@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 
-import { sendChat, type ChatResponse } from "@/lib/api";
+import StatusPanel from "@/components/StatusPanel";
+import { fetchHealth, sendChat, type ChatResponse, type HealthResponse } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -59,6 +60,9 @@ export default function ChatPage() {
   const [merchantId, setMerchantId] = useState("m123");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [sessionState, setSessionState] = useState<Record<string, unknown> | null>(null);
+  const [lastToolData, setLastToolData] = useState<Record<string, unknown> | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -69,6 +73,17 @@ export default function ChatPage() {
   ]);
 
   const canSend = useMemo(() => message.trim().length > 0 && !loading, [message, loading]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const nextHealth = await fetchHealth();
+        setHealth(nextHealth);
+      } catch {
+        setHealth(null);
+      }
+    })();
+  }, []);
 
   async function handleSubmit(nextMessage?: string) {
     const finalMessage = (nextMessage ?? message).trim();
@@ -101,6 +116,8 @@ export default function ChatPage() {
           data: response.data,
         },
       ]);
+      setSessionState(response.session_state ?? null);
+      setLastToolData(response.data ?? null);
     } catch (error) {
       const err =
         error instanceof Error ? error.message : "Unknown error while calling backend.";
@@ -119,11 +136,11 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-      <aside className="rounded-3xl border bg-card/85 p-6 shadow-xl shadow-primary/5 backdrop-blur">
-        <h2 className="text-lg font-semibold">Starter prompts</h2>
+    <div className="grid gap-6 xl:grid-cols-[300px_320px_1fr]">
+      <aside className="rounded-xl border bg-card p-6 shadow-sm">
+        <h2 className="text-lg font-semibold">Demo workflow</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Minimal chat UI wired to the FastAPI backend for the three supported flows.
+          Use the guided flow below to keep the demo consistent and fast.
         </p>
 
         <div className="mt-5 flex flex-col gap-2.5">
@@ -132,7 +149,7 @@ export default function ChatPage() {
               key={prompt}
               type="button"
               variant="outline"
-              className="h-auto justify-start rounded-2xl px-4 py-3 text-left whitespace-normal"
+              className="h-auto justify-start rounded-lg px-4 py-3 text-left whitespace-normal"
               onClick={() => void handleSubmit(prompt)}
               disabled={loading}
             >
@@ -144,24 +161,33 @@ export default function ChatPage() {
         <div className="mt-6">
           <h3 className="text-sm font-medium">Supported actions</h3>
           <div className="mt-3 flex flex-wrap gap-2">
-            <span className="rounded-full border bg-secondary px-3 py-1 text-xs text-secondary-foreground">
+            <span className="rounded-md border bg-secondary px-3 py-1 text-xs text-secondary-foreground">
               Create payment link
             </span>
-            <span className="rounded-full border bg-secondary px-3 py-1 text-xs text-secondary-foreground">
+            <span className="rounded-md border bg-secondary px-3 py-1 text-xs text-secondary-foreground">
               Check payment status
             </span>
-            <span className="rounded-full border bg-secondary px-3 py-1 text-xs text-secondary-foreground">
+            <span className="rounded-md border bg-secondary px-3 py-1 text-xs text-secondary-foreground">
               Get reserve balance
             </span>
           </div>
         </div>
       </aside>
 
-      <section className="flex min-h-[75vh] flex-col rounded-3xl border bg-card/90 shadow-xl shadow-primary/5 backdrop-blur">
+      <StatusPanel
+        health={health}
+        loading={loading}
+        sessionId={sessionId}
+        merchantId={merchantId}
+        sessionState={sessionState}
+        lastToolData={lastToolData}
+      />
+
+      <section className="flex min-h-[75vh] flex-col rounded-xl border bg-card shadow-sm">
         <div className="border-b px-6 py-5">
-          <h2 className="text-lg font-semibold">Agent chat</h2>
+          <h2 className="text-lg font-semibold">Operator console</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Frontend sends chat messages to FastAPI and renders tool-call results.
+            Chat interface for the three MVP payment workflows.
           </p>
         </div>
 
@@ -177,14 +203,14 @@ export default function ChatPage() {
                 <div
                   className={`max-w-[85%] rounded-2xl border px-4 py-3 text-sm shadow-sm ${
                     item.role === "user"
-                      ? "border-primary/30 bg-primary text-primary-foreground"
-                      : "bg-background/70"
+                    ? "border-primary bg-primary text-primary-foreground"
+                      : "bg-background"
                   }`}
                 >
                   <div>{item.content}</div>
 
                   {item.toolCalled ? (
-                    <div className="mt-3 rounded-xl border bg-muted/60 p-3">
+                    <div className="mt-3 rounded-lg border bg-muted/60 p-3">
                       <div>
                         <strong>Tool:</strong> {item.toolCalled.tool_name}
                       </div>
@@ -195,7 +221,7 @@ export default function ChatPage() {
                   ) : null}
 
                   {formattedData ? (
-                    <pre className="mt-3 whitespace-pre-wrap rounded-xl border bg-muted/60 p-3 text-xs text-muted-foreground">
+                    <pre className="mt-3 whitespace-pre-wrap rounded-lg border bg-muted/60 p-3 text-xs text-muted-foreground">
                       {formattedData}
                     </pre>
                   ) : null}
@@ -214,7 +240,7 @@ export default function ChatPage() {
 
           {loading ? (
             <div className="flex justify-start">
-              <div className="rounded-2xl border bg-background/70 px-4 py-3 text-sm shadow-sm">
+              <div className="rounded-lg border bg-background px-4 py-3 text-sm shadow-sm">
                 <Loader2 className="mr-2 inline-block size-4 animate-spin align-text-bottom" />
                 Processing request...
               </div>
