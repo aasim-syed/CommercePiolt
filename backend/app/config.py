@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     use_mock_pine_labs: bool = True
     pine_labs_base_url: str | None = None
+    pine_labs_payouts_base_url: str | None = None
     pine_labs_api_key: str | None = None
     pine_labs_client_id: str | None = None
     pine_labs_client_secret: str | None = None

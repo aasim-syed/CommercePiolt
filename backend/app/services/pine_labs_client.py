@@ -110,8 +110,10 @@ class PineLabsClient:
         method: str,
         path: str,
         payload: dict[str, Any] | None = None,
+        base_url_override: str | None = None,
     ) -> dict[str, Any]:
-        url = f"{self.base_url}{path}"
+        resolved_base_url = (base_url_override or self.base_url).rstrip("/")
+        url = f"{resolved_base_url}{path}"
 
         logger.info(
             "pine_labs_request_started",

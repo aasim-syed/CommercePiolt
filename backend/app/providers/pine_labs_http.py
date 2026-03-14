@@ -142,6 +142,7 @@ class PineLabsHTTPProvider:
         response = await pine_labs_client.request(
             "GET",
             "/payouts/v3/payments/funding-account",
+            base_url_override=settings.pine_labs_payouts_base_url,
         )
         balance = response.get("balance", {})
 

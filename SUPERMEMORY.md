@@ -168,3 +168,80 @@ This file is a compact handoff of the work completed in this session so future w
 If resuming later, start with:
 "Read `SUPERMEMORY.md`, do not read `backend/.env`, and continue from the current AWS-live / Pine-Labs-partial state."
 
+## Session Continuation: Latest Updates
+
+### AWS / Bedrock findings
+- Bedrock integration path was exercised through backend logs.
+- Result:
+  - request path is wired correctly
+  - but AWS returned `UnrecognizedClientException`
+- Meaning:
+  - the Bedrock client is being used
+  - credentials/token/session are invalid or incomplete
+- Important note:
+  - if AWS creds are temporary workshop creds, `AWS_SESSION_TOKEN` may still be needed
+
+### Pine Labs auth and live calls
+- Pine Labs OAuth token flow was implemented in the backend.
+- Live create-payment-link flow now works against Pine Labs UAT.
+- This is currently the strongest live provider proof in the project.
+
+### Pine Labs payment status
+- Initial route guesses failed.
+- A narrow fallback was added:
+  - `/api/pay/v1/payment/{payment_ref}`
+  - fallback: `/api/pay/v1/paymentlink/{payment_ref}`
+- Status is still not fully confirmed live.
+- Current likely issue:
+  - route and/or identifier mismatch between payment link id and actual payment id
+
+### Pine Labs reserve balance
+- Earlier balance route guesses were wrong.
+- New doc file `acoountbalance` showed a different payouts endpoint:
+  - `https://plural-uat.v2.pinepg.in/payouts/v3/payments/funding-account`
+- Backend was updated to support a separate payouts host using:
+  - `PINE_LABS_PAYOUTS_BASE_URL`
+- Runtime findings:
+  - `pluraluat.v2...` host gave auth/route style failures
+  - `plural-uat.v2...` host produced DNS/network failure (`Name or service not known`)
+- User was informed that payouts is currently unusable / unreliable for the demo and mock data is acceptable.
+- Conclusion:
+  - reserve balance should fall back to deterministic mock/stub mode for demo reliability
+
+### Health / status panel alignment
+- The UI originally showed `Pine Labs pending` based on outdated readiness logic.
+- This was corrected.
+- Backend `/health` now exposes:
+  - `pine_labs_auth_configured`
+- Frontend status badge now reflects:
+  - `Pine Labs auth ready` in HTTP mode when OAuth config is present
+  - `Pine Labs stub mode` in mock mode
+  - `Pine Labs pending` only when auth truly is missing
+
+### Current reality snapshot
+- Working live:
+  - Pine Labs OAuth token generation
+  - Pine Labs create payment link
+  - sidebar UI / system panel / chat shell
+  - demo trigger for payment status transitions
+- Partial / uncertain:
+  - payment status live endpoint
+  - AWS Bedrock live auth validity
+- Not viable live right now:
+  - reserve balance payouts endpoint
+
+### Current recommended demo story
+- Live:
+  - create payment link via Pine Labs
+- Controlled demo mode:
+  - reserve balance via merchant-aware stub
+  - payment status via session + manual event trigger
+- Positioning:
+  - operator workflow and orchestration are complete
+  - provider adapter is real
+  - one live payment action is proven
+  - remaining provider surfaces are partially blocked by Pine Labs environment behavior
+
+### Immediate next step after this memory update
+- Implement deterministic stub fallback for reserve balance
+- Then polish assistant replies / UI result presentation for judges
