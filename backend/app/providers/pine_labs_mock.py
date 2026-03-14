@@ -3,22 +3,20 @@ from __future__ import annotations
 from typing import Any
 from uuid import uuid4
 
-from app.constants import (
-    DEFAULT_CURRENCY,
-    STATUS_LINK_CREATED,
-    STATUS_PENDING,
-)
+from app.constants import DEFAULT_CURRENCY, STATUS_LINK_CREATED, STATUS_PENDING
 
 
 class PineLabsMockProvider:
     async def create_payment_link(
         self,
         amount: float,
+        currency: str | None = None,
         merchant_id: str | None = None,
     ) -> dict[str, Any]:
         order_id = f"order_{uuid4().hex[:12]}"
         payment_ref = f"pay_{uuid4().hex[:10]}"
         payment_url = f"https://sandbox.payments.local/{payment_ref}"
+        resolved_currency = (currency or DEFAULT_CURRENCY).upper()
 
         return {
             "success": True,
@@ -28,8 +26,8 @@ class PineLabsMockProvider:
             "merchant_id": merchant_id,
             "payment_url": payment_url,
             "status": STATUS_LINK_CREATED,
-            "currency": DEFAULT_CURRENCY,
-            "message": f"Created payment link for ₹{amount:.2f}.",
+            "currency": resolved_currency,
+            "message": f"Created payment link for {resolved_currency} {amount:.2f}.",
             "provider": "mock",
         }
 

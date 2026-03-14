@@ -32,6 +32,13 @@ def extract_merchant_id_rule_based(message: str) -> str | None:
     return match.group(1)
 
 
+def extract_currency_rule_based(message: str) -> str | None:
+    match = re.search(r"\b(INR|USD|EUR)\b", message, re.IGNORECASE)
+    if not match:
+        return None
+    return match.group(1).upper()
+
+
 def detect_intent_rule_based(message: str) -> str | None:
     text = message.lower().strip()
 
@@ -101,6 +108,9 @@ async def resolve_route(
         amount = extract_amount_rule_based(message)
         if amount is not None:
             args["amount"] = amount
+        currency = extract_currency_rule_based(message)
+        if currency is not None:
+            args["currency"] = currency
 
     elif intent == CHECK_PAYMENT_STATUS:
         payment_ref = extract_payment_ref_rule_based(message)

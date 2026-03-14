@@ -8,6 +8,7 @@ from app.services.pine_labs import get_pine_labs_provider
 
 async def create_payment_link(
     amount: float,
+    currency: str | None = None,
     merchant_id: str | None = None,
     **_: Any,
 ) -> dict[str, Any]:
@@ -17,6 +18,7 @@ async def create_payment_link(
     provider = get_pine_labs_provider()
     return await provider.create_payment_link(
         amount=amount,
+        currency=currency,
         merchant_id=merchant_id,
     )
 

@@ -77,6 +77,7 @@ async def handle_chat(
 
         if route.intent == CREATE_PAYMENT_LINK:
             amount = route.args.get("amount")
+            currency = route.args.get("currency")
             if amount is None:
                 return (
                     "Please specify an amount like 1200.",
@@ -94,6 +95,7 @@ async def handle_chat(
             tool = TOOL_REGISTRY[CREATE_PAYMENT_LINK]
             result = await tool(
                 amount=float(amount),
+                currency=str(currency).upper() if currency else None,
                 merchant_id=merchant_for_call,
             )
 
@@ -107,9 +109,10 @@ async def handle_chat(
             amount_value = float(result.get("amount", amount))
             payment_ref = result.get("payment_ref")
             payment_url = result.get("payment_url")
+            currency = result.get("currency", "INR")
 
             reply = (
-                f"Created payment link for ₹{amount_value:.2f}. "
+                f"Created payment link for {currency} {amount_value:.2f}. "
                 f"Payment ref: {payment_ref}. "
                 f"URL: {payment_url}"
             )
@@ -120,6 +123,7 @@ async def handle_chat(
                     "tool_name": CREATE_PAYMENT_LINK,
                     "arguments": {
                         "amount": float(amount),
+                        "currency": str(currency).upper() if currency else None,
                         "merchant_id": merchant_for_call,
                         "route_source": route.source,
                     },

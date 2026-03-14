@@ -245,3 +245,66 @@ If resuming later, start with:
 ### Immediate next step after this memory update
 - Implement deterministic stub fallback for reserve balance
 - Then polish assistant replies / UI result presentation for judges
+
+## Session Continuation: AWS Deployment Notes
+
+### Workshop deployment reality
+- The AWS workshop menus visible to the user do not expose modern managed deployment paths like Amplify or App Runner.
+- The practical deployment path from the available workshop options is:
+  - frontend via S3 static hosting or container
+  - backend via Docker on EC2
+- Later, the user clarified the workshop expectation is to push Docker images.
+
+### Agreed deployment direction
+- Full deploy should use Docker images for both services.
+- Required AWS resources for this workshop-style deploy:
+  - 2 ECR repositories
+    - one for backend image
+    - one for frontend image
+  - 1 EC2 instance to run containers
+- Public endpoints will be needed for:
+  - frontend
+  - backend
+
+### Bedrock status
+- AWS credentials are now valid enough to reach Bedrock.
+- Latest failure is no longer credential-related.
+- Current Bedrock blocker:
+  - model invocation failed with `ValidationException`
+  - the configured model id requires an inference profile / ARN rather than on-demand invocation
+- If the workshop account does not expose Bedrock inference-profile setup, Bedrock should be treated as partially blocked for the demo.
+
+### Pine Labs status at this point
+- Live:
+  - token generation
+  - create payment link
+- Partial / unresolved:
+  - payment status live verification
+- Blocked / unreliable:
+  - reserve balance payouts endpoint
+- Demo-safe fallback chosen:
+  - reserve balance mocked in frontend
+
+### Current live vs demo split
+- Live:
+  - Pine Labs create payment link
+  - backend orchestration shell
+  - token-based Pine Labs auth path
+- Demo / simulated:
+  - reserve balance frontend mock
+  - webhook-style manual status trigger
+- Partial:
+  - payment status live endpoint path/id mapping
+  - Bedrock account/model configuration
+
+### Immediate next plans
+1. Update memory before any further changes. Completed.
+2. Keep reserve balance mocked and stable for demo.
+3. Continue working on live payment status verification if time remains.
+4. Prepare Docker images for both frontend and backend.
+5. Create:
+   - backend ECR repo
+   - frontend ECR repo
+   - EC2 instance
+6. Push both Docker images and run them on EC2.
+7. If Bedrock inference profile cannot be obtained in time, keep the LLM path non-blocking for the demo story.

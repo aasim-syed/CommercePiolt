@@ -17,9 +17,11 @@ class PineLabsHTTPProvider:
     async def create_payment_link(
         self,
         amount: float,
+        currency: str | None = None,
         merchant_id: str | None = None,
     ) -> dict[str, Any]:
         resolved_merchant_id = merchant_id or settings.pine_labs_merchant_id
+        resolved_currency = (currency or DEFAULT_CURRENCY).upper()
 
         expire_by = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
@@ -30,7 +32,7 @@ class PineLabsHTTPProvider:
         payload = {
             "amount": {
                 "value": amount_minor,
-                "currency": DEFAULT_CURRENCY,
+                "currency": resolved_currency,
             },
             "description": f"CommercePilot payment link for {reference}",
             "expire_by": expire_by,
@@ -100,7 +102,7 @@ class PineLabsHTTPProvider:
             "currency": (
                 response_data.get("amount", {}).get("currency")
                 or response.get("amount", {}).get("currency")
-                or DEFAULT_CURRENCY
+                or resolved_currency
             ),
             "merchant_id": resolved_merchant_id,
             "message": response.get("message", "Payment link created successfully."),

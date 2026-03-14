@@ -55,7 +55,7 @@ class LLMRouter:
                 "Extract arguments for tool create_payment_link.\n"
                 "Return ONLY strict JSON.\n"
                 "Do not include markdown. Do not include explanation.\n"
-                '{"amount": number|null, "merchant_id": string|null}'
+                '{"amount": number|null, "currency": string|null, "merchant_id": string|null}'
             )
         elif tool_name == CHECK_PAYMENT_STATUS:
             prompt = (

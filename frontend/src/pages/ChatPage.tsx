@@ -17,13 +17,23 @@ type Message = {
 
 const starterPrompts = [
   "Create payment link for 1200",
+  "Create payment link for 100 USD",
   "What is my reserve balance?",
   "Check payment status",
 ];
 
+const supportedCurrencies = ["INR", "USD", "EUR"] as const;
+
 function isReserveBalancePrompt(input: string): boolean {
   const text = input.trim().toLowerCase();
   return text.includes("reserve balance") || text.includes("balance");
+}
+
+function injectCurrencyIntoPrompt(input: string, currency: string): string {
+  const text = input.trim();
+  if (!text.toLowerCase().includes("create payment link")) return text;
+  if (/\b(?:INR|USD|EUR)\b/i.test(text)) return text;
+  return `${text} ${currency}`;
 }
 
 function formatToolData(data: Record<string, unknown> | null | undefined): string | null {
@@ -82,6 +92,7 @@ export default function ChatPage({
   onLastToolDataChange,
 }: ChatPageProps) {
   const [message, setMessage] = useState("");
+  const [currency, setCurrency] = useState<(typeof supportedCurrencies)[number]>("INR");
   const [loading, setLoading] = useState(false);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [messages, setMessages] = useState<Message[]>([
@@ -107,7 +118,7 @@ export default function ChatPage({
   }, []);
 
   async function handleSubmit(nextMessage?: string) {
-    const finalMessage = (nextMessage ?? message).trim();
+    const finalMessage = injectCurrencyIntoPrompt((nextMessage ?? message).trim(), currency);
     if (!finalMessage || loading) return;
 
     const userMessage: Message = {
@@ -214,6 +225,24 @@ export default function ChatPage({
             </span>
           </div>
         </div>
+
+        <div className="mt-6">
+          <h3 className="text-sm font-medium">Payment currency</h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {supportedCurrencies.map((code) => (
+              <Button
+                key={code}
+                type="button"
+                variant={currency === code ? "default" : "outline"}
+                className="rounded-md"
+                onClick={() => setCurrency(code)}
+                disabled={loading}
+              >
+                {code}
+              </Button>
+            ))}
+          </div>
+        </div>
       </aside>
 
       <StatusPanel
@@ -306,7 +335,7 @@ export default function ChatPage({
 
           <Textarea
             className="mt-3"
-            placeholder="Type something like: create payment link for 1200"
+            placeholder={`Type something like: create payment link for 1200 ${currency}`}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={(e) => {
