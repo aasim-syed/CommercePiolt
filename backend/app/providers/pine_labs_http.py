@@ -63,11 +63,24 @@ class PineLabsHTTPProvider:
         if resolved_merchant_id:
             payload["merchant_metadata"] = {"merchant_id": resolved_merchant_id}
 
-        response = await pine_labs_client.request(
-            "POST",
-            "/api/pay/v1/paymentlink",
-            payload,
-        )
+        try:
+            response = await pine_labs_client.request(
+                "POST",
+                "/api/pay/v1/paymentlink",
+                payload,
+            )
+        except AgentExecutionError as exc:
+            if "Currency is invalid" not in str(exc):
+                raise
+
+            result = await self.fallback_provider.create_payment_link(
+                amount=amount,
+                currency=resolved_currency,
+                merchant_id=resolved_merchant_id,
+            )
+            result["provider"] = "sandbox_stub"
+            result["message"] = f"Payment link created from sandbox stub for {resolved_currency}."
+            return result
 
         response_data = response.get("data", {})
         payment_ref = (

@@ -29,12 +29,11 @@ function isReserveBalancePrompt(input: string): boolean {
   return text.includes("reserve balance") || text.includes("balance");
 }
 
-function injectCurrencyIntoPrompt(input: string, currency: string): string {
-  const text = input.trim();
-  if (!text.toLowerCase().includes("create payment link")) return text;
-  if (/\b(?:INR|USD|EUR)\b/i.test(text)) return text;
-  return `${text} ${currency}`;
+function extractCurrency(input: string): string | null {
+  const match = input.match(/\b(INR|USD|EUR)\b/i);
+  return match ? match[1].toUpperCase() : null;
 }
+
 
 function formatToolData(data: Record<string, unknown> | null | undefined): string | null {
   if (!data) return null;
@@ -118,7 +117,7 @@ export default function ChatPage({
   }, []);
 
   async function handleSubmit(nextMessage?: string) {
-    const finalMessage = injectCurrencyIntoPrompt((nextMessage ?? message).trim(), currency);
+    const finalMessage = (nextMessage ?? message).trim();
     if (!finalMessage || loading) return;
 
     const userMessage: Message = {
@@ -129,6 +128,8 @@ export default function ChatPage({
 
     setMessages((prev) => [...prev, userMessage]);
     setMessage("");
+
+    const requestedCurrency = extractCurrency(finalMessage) ?? currency;
 
     if (isReserveBalancePrompt(finalMessage)) {
       const mockedData = {
@@ -143,6 +144,32 @@ export default function ChatPage({
           id: crypto.randomUUID(),
           role: "assistant",
           content: "Reserve balance is ₹50,000.00 INR.",
+          data: mockedData,
+        },
+      ]);
+      onLastToolDataChange(mockedData);
+      return;
+    }
+
+    if (
+      finalMessage.toLowerCase().includes("create payment link") &&
+      requestedCurrency !== "INR"
+    ) {
+      const mockedData = {
+        payment_ref: `fx_demo_${requestedCurrency.toLowerCase()}`,
+        payment_url: `https://sandbox.payments.local/fx/${requestedCurrency.toLowerCase()}`,
+        status: "CREATED",
+        amount: Number(finalMessage.match(/(\d+(?:\.\d{1,2})?)/)?.[1] ?? "0"),
+        currency: requestedCurrency,
+        provider_mode: "sandbox_stub",
+      };
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `Created ${requestedCurrency} payment link in sandbox demo mode.`,
           data: mockedData,
         },
       ]);
@@ -227,7 +254,7 @@ export default function ChatPage({
         </div>
 
         <div className="mt-6">
-          <h3 className="text-sm font-medium">Payment currency</h3>
+          <h3 className="text-sm font-medium">Multi-currency demo</h3>
           <div className="mt-3 flex flex-wrap gap-2">
             {supportedCurrencies.map((code) => (
               <Button
@@ -242,6 +269,9 @@ export default function ChatPage({
               </Button>
             ))}
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            USD and EUR currently run in sandbox demo mode.
+          </p>
         </div>
       </aside>
 
