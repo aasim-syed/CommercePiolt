@@ -55,14 +55,30 @@ function formatToolData(data: Record<string, unknown> | null | undefined): strin
   return JSON.stringify(data, null, 2);
 }
 
-export default function ChatPage() {
-  const [sessionId, setSessionId] = useState("s1");
-  const [merchantId, setMerchantId] = useState("m123");
+type ChatPageProps = {
+  sessionId: string;
+  merchantId: string;
+  onSessionIdChange: (value: string) => void;
+  onMerchantIdChange: (value: string) => void;
+  sessionState: Record<string, unknown> | null;
+  lastToolData: Record<string, unknown> | null;
+  onSessionStateChange: (value: Record<string, unknown> | null) => void;
+  onLastToolDataChange: (value: Record<string, unknown> | null) => void;
+};
+
+export default function ChatPage({
+  sessionId,
+  merchantId,
+  onSessionIdChange,
+  onMerchantIdChange,
+  sessionState,
+  lastToolData,
+  onSessionStateChange,
+  onLastToolDataChange,
+}: ChatPageProps) {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [sessionState, setSessionState] = useState<Record<string, unknown> | null>(null);
-  const [lastToolData, setLastToolData] = useState<Record<string, unknown> | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -116,8 +132,8 @@ export default function ChatPage() {
           data: response.data,
         },
       ]);
-      setSessionState(response.session_state ?? null);
-      setLastToolData(response.data ?? null);
+      onSessionStateChange(response.session_state ?? null);
+      onLastToolDataChange(response.data ?? null);
     } catch (error) {
       const err =
         error instanceof Error ? error.message : "Unknown error while calling backend.";
@@ -253,12 +269,12 @@ export default function ChatPage() {
             <Input
               placeholder="Session ID"
               value={sessionId}
-              onChange={(e) => setSessionId(e.target.value)}
+              onChange={(e) => onSessionIdChange(e.target.value)}
             />
             <Input
               placeholder="Merchant ID"
               value={merchantId}
-              onChange={(e) => setMerchantId(e.target.value)}
+              onChange={(e) => onMerchantIdChange(e.target.value)}
             />
           </div>
 

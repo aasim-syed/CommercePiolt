@@ -27,3 +27,17 @@ class PineLabsWebhookResponse(BaseModel):
     updated_status: str
     session_found: bool
     message: str
+
+
+class DemoPaymentStatusRequest(BaseModel):
+    payment_ref: str
+    status: str
+
+
+class DemoPaymentStatusResponse(BaseModel):
+    ok: bool
+    payment_ref: str
+    updated_status: str
+    session_found: bool
+    mode: str
+    message: str

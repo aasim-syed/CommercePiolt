@@ -13,6 +13,12 @@ EVENT_STATUS_MAP = {
     PineLabsEvent.PAYMENT_EXPIRED: STATUS_EXPIRED,
 }
 
+DEMO_STATUS_MAP = {
+    STATUS_SUCCESS: STATUS_SUCCESS,
+    STATUS_FAILED: STATUS_FAILED,
+    STATUS_EXPIRED: STATUS_EXPIRED,
+}
+
 
 async def process_pine_labs_webhook(
     payload: PineLabsWebhookPayload,
@@ -57,5 +63,38 @@ async def process_pine_labs_webhook(
             f"Updated status to {updated_status}."
             if session_found
             else f"Webhook processed for {payment_ref}, but no matching session was found."
+        ),
+    }
+
+
+async def trigger_demo_payment_status(payment_ref: str, status_value: str) -> dict:
+    normalized_status = (status_value or "").strip().upper()
+    if normalized_status not in DEMO_STATUS_MAP:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported demo status: {status_value}",
+        )
+
+    if not (payment_ref or "").strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="payment_ref is required",
+        )
+
+    session_found = session_store.update_payment_status(
+        payment_ref=payment_ref.strip(),
+        status=normalized_status,
+    )
+
+    return {
+        "ok": True,
+        "payment_ref": payment_ref.strip(),
+        "updated_status": normalized_status,
+        "session_found": session_found,
+        "mode": "demo_trigger",
+        "message": (
+            f"Demo status updated to {normalized_status} for {payment_ref.strip()}."
+            if session_found
+            else f"Demo trigger received for {payment_ref.strip()}, but no matching session was found."
         ),
     }

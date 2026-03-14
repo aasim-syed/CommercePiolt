@@ -26,6 +26,20 @@ export type HealthResponse = {
   bedrock_configured: boolean;
 };
 
+export type DemoPaymentStatusRequest = {
+  payment_ref: string;
+  status: "SUCCESS" | "FAILED" | "EXPIRED";
+};
+
+export type DemoPaymentStatusResponse = {
+  ok: boolean;
+  payment_ref: string;
+  updated_status: string;
+  session_found: boolean;
+  mode: string;
+  message: string;
+};
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.trim() || "http://127.0.0.1:8000";
 
@@ -66,4 +80,35 @@ export async function fetchHealth(): Promise<HealthResponse> {
   }
 
   return response.json() as Promise<HealthResponse>;
+}
+
+export async function triggerDemoPaymentStatus(
+  payload: DemoPaymentStatusRequest,
+): Promise<DemoPaymentStatusResponse> {
+  const response = await fetch(`${API_BASE_URL}/webhooks/demo/payment-status`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let errorMessage = "Demo trigger failed";
+
+    try {
+      const errorData = await response.json();
+      errorMessage =
+        errorData?.detail ||
+        errorData?.message ||
+        `Demo trigger failed with status ${response.status}`;
+    } catch {
+      const text = await response.text();
+      errorMessage = text || `Demo trigger failed with status ${response.status}`;
+    }
+
+    throw new Error(errorMessage);
+  }
+
+  return response.json() as Promise<DemoPaymentStatusResponse>;
 }

@@ -19,14 +19,33 @@ const navItems: Array<{
 
 export default function App() {
   const [activeView, setActiveView] = useState<ViewId>("overview");
+  const [sessionId, setSessionId] = useState("s1");
+  const [merchantId, setMerchantId] = useState("m123");
+  const [sessionState, setSessionState] = useState<Record<string, unknown> | null>(null);
+  const [lastToolData, setLastToolData] = useState<Record<string, unknown> | null>(null);
 
   const content =
     activeView === "overview" ? (
       <OverviewPage />
     ) : activeView === "system" ? (
-      <SystemPage />
+      <SystemPage
+        sessionId={sessionId}
+        merchantId={merchantId}
+        sessionState={sessionState}
+        lastToolData={lastToolData}
+        onSessionStateChange={setSessionState}
+      />
     ) : (
-      <ChatPage />
+      <ChatPage
+        sessionId={sessionId}
+        merchantId={merchantId}
+        onSessionIdChange={setSessionId}
+        onMerchantIdChange={setMerchantId}
+        sessionState={sessionState}
+        lastToolData={lastToolData}
+        onSessionStateChange={setSessionState}
+        onLastToolDataChange={setLastToolData}
+      />
     );
 
   return (
