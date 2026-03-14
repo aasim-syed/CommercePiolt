@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     aws_region: str | None = None
     aws_access_key_id: str | None = None
     aws_secret_access_key: str | None = None
+    aws_session_token: str | None = None
     bedrock_model_id: str | None = None
 
     allowed_origins: str | None = None

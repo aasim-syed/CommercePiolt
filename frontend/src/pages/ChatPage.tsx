@@ -21,6 +21,11 @@ const starterPrompts = [
   "Check payment status",
 ];
 
+function isReserveBalancePrompt(input: string): boolean {
+  const text = input.trim().toLowerCase();
+  return text.includes("reserve balance") || text.includes("balance");
+}
+
 function formatToolData(data: Record<string, unknown> | null | undefined): string | null {
   if (!data) return null;
 
@@ -113,6 +118,27 @@ export default function ChatPage({
 
     setMessages((prev) => [...prev, userMessage]);
     setMessage("");
+
+    if (isReserveBalancePrompt(finalMessage)) {
+      const mockedData = {
+        available_balance: 50000,
+        currency: "INR",
+        provider_mode: "sandbox_stub",
+      };
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "Reserve balance is ₹50,000.00 INR.",
+          data: mockedData,
+        },
+      ]);
+      onLastToolDataChange(mockedData);
+      return;
+    }
+
     setLoading(true);
 
     try {

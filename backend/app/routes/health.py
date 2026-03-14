@@ -33,4 +33,5 @@ async def health() -> dict[str, object]:
             and settings.aws_secret_access_key
             and settings.bedrock_model_id
         ),
+        "aws_session_token_present": bool(settings.aws_session_token),
     }

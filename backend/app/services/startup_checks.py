@@ -23,6 +23,7 @@ def run_startup_checks() -> None:
                 "pine_labs_merchant_id_present": bool(settings.pine_labs_merchant_id),
                 "bedrock_model_id": settings.bedrock_model_id,
                 "aws_region": settings.aws_region,
+                "aws_session_token_present": bool(settings.aws_session_token),
                 "allowed_origins": settings.allowed_origins_list,
             }
         },
