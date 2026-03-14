@@ -7,11 +7,24 @@ router = APIRouter(tags=["health"])
 
 @router.get("/health")
 async def health() -> dict[str, object]:
+    pine_labs_auth_configured = bool(
+        settings.pine_labs_base_url
+        and (
+            settings.pine_labs_api_key
+            or (
+                settings.pine_labs_client_id
+                and settings.pine_labs_client_secret
+                and settings.pine_labs_grant_type
+            )
+        )
+    )
+
     return {
         "ok": True,
         "app_name": settings.app_name,
         "environment": settings.app_env,
         "pine_labs_mode": "mock" if settings.use_mock_pine_labs else "http",
+        "pine_labs_auth_configured": pine_labs_auth_configured,
         "pine_labs_base_url_configured": bool(settings.pine_labs_base_url),
         "pine_labs_merchant_id_configured": bool(settings.pine_labs_merchant_id),
         "bedrock_configured": bool(

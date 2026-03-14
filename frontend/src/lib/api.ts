@@ -21,6 +21,7 @@ export type HealthResponse = {
   app_name: string;
   environment: string;
   pine_labs_mode: string;
+  pine_labs_auth_configured: boolean;
   pine_labs_base_url_configured: boolean;
   pine_labs_merchant_id_configured: boolean;
   bedrock_configured: boolean;

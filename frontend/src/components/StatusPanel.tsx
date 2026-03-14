@@ -62,7 +62,7 @@ export default function StatusPanel({
           <p className="text-xs font-semibold tracking-[0.22em] text-muted-foreground uppercase">
             System status
           </p>
-          <h2 className="mt-1 text-lg font-semibold">Demo control panel</h2>
+          <h2 className="mt-1 text-lg font-semibold"> control panel</h2>
         </div>
         <div className="grid size-10 place-items-center rounded-md bg-primary/8 text-primary">
           <Wallet className="size-5" />
@@ -73,11 +73,13 @@ export default function StatusPanel({
         <StatusBadge label={`Bedrock ${health?.bedrock_configured ? "ready" : "not ready"}`} ok={Boolean(health?.bedrock_configured)} />
         <StatusBadge
           label={`Pine Labs ${
-            health?.pine_labs_base_url_configured && health?.pine_labs_merchant_id_configured
-              ? "configured"
+            health?.pine_labs_auth_configured
+              ? health?.pine_labs_mode === "http"
+                ? "auth ready"
+                : "stub mode"
               : "pending"
           }`}
-          ok={Boolean(health?.pine_labs_base_url_configured && health?.pine_labs_merchant_id_configured)}
+          ok={Boolean(health?.pine_labs_auth_configured || health?.pine_labs_mode === "mock")}
         />
       </div>
 
